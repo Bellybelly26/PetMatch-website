@@ -1,6 +1,40 @@
 const SUPABASE_URL = "https://onakypdwkgqfjxairstd.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWt5cGR3a2dxZmp4YWlyc3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzQxMzMsImV4cCI6MjA5NzMxMDEzM30.YeTSG2SvzNaWVbGShXVD90sYP72plAyhtmgfswK4fx8";
+
 const supabase = window.supabase.creatClient(SUAPABSE_URL, SUPABASE_ANON_KEY);
+
+document.addEventListener('DOMContentLoaded', () => {
+  const botaoCadastrar = document.querySelector('input[value="Cadastrar"]');
+
+  if (botaoCadastrar) {
+    botaoCadastrar.addEventListener('click', async (event) => {
+      event.preventDefault(); 
+
+      const emailInput = document.getElementById('email');
+      
+      if (!emailInput || !emailInput.value) {
+        alert('Por favor, digite um e-mail válido!');
+        return;
+      }
+
+      const emailDigitado = emailInput.value;
+
+      const { data, error } = await supabase
+        .from('adotadores') 
+        .insert([
+          { email: emailDigitado } 
+        ]);
+
+      if (error) {
+        console.error('Erro no Supabase:', error.message);
+        alert('Erro ao cadastrar e-mail: ' + error.message);
+      } else {
+        alert('E-mail cadastrado com sucesso no site!');
+        emailInput.value = ''; 
+      }
+    });
+  }
+});
 
 // ===== ESTADO GLOBAL =====
 let currentUser = null;
