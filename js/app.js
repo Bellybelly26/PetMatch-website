@@ -1,5 +1,5 @@
-const SUPABASE_URL = "SUA_URL_DO_SUPABASE_AQUI";
-const SUPABASE_ANON_KEY = "SUA_CHAVE_ANON_AQUI";
+const SUPABASE_URL = "https://onakypdwkgqfjxairstd.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWt5cGR3a2dxZmp4YWlyc3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzQxMzMsImV4cCI6MjA5NzMxMDEzM30.YeTSG2SvzNaWVbGShXVD90sYP72plAyhtmgfswK4fx8";
 const supabase = window.supabase.creatClient(SUAPABSE_URL, SUPABASE_ANON_KEY);
 
 // ===== ESTADO GLOBAL =====
