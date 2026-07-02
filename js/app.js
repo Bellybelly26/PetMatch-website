@@ -1,37 +1,33 @@
 const SUPABASE_URL = "https://onakypdwkgqfjxairstd.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWt5cGR3a2dxZmp4YWlyc3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzQxMzMsImV4cCI6MjA5NzMxMDEzM30.YeTSG2SvzNaWVbGShXVD90sYP72plAyhtmgfswK4fx8";
 
-const supabase = supabaseClient.createClient(supabaseUrl, supabaseKey)
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// FUNÇÃO DE CADASTRO (Ajustada para o seu botão)
-async function cadastrarUsuario(event) {
-  // Impede a página de atualizar no celular
-  if (event) event.preventDefault();
+// Evento do botão cadastrar
+document.getElementById('bnt-cadastro').addEventListener('click', async function(event) {
+    event.preventDefault(); // Impede a página de recarregar e quebrar o fluxo
 
-  // Pega o e-mail digitado na caixinha
-  const emailInput = document.getElementById('email');
-  
-  if (!emailInput || !emailInput.value) {
-    alert('Por favor, digite um e-mail primeiro!');
-    return;
-  }
+    // Correção: Buscando os valores digitados nos inputs corretos do HTML
+    const email = document.getElementById('email').value;
+    const senha = document.getElementById('senha').value;
 
-  const emailDigitado = emailInput.value;
+    try {
+        // Adicionado async/await correto para fazer a comunicação com o Supabase Auth
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: senha,
+        });
 
-  // Envia para o banco de dados
-  const { data, error } = await supabase
-    .from('adotadores')
-    .insert([
-      { email: emailDigitado }
-    ]);
-
-  if (error) {
-    alert('Erro ao cadastrar: ' + error.message);
-  } else {
-    alert('E-mail cadastrado com sucesso!');
-    emailInput.value = ''; // Limpa o campo
-  }
-}
+        if (error) {
+            alert('Erro ao cadastrar: ' + error.message);
+        } else {
+            alert('Cadastro realizado com sucesso! Verifique seu e-mail.');
+            console.log(data);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}};
 
 // ===== ESTADO GLOBAL =====
 let currentUser = null;
