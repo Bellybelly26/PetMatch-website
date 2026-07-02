@@ -1,40 +1,37 @@
 const SUPABASE_URL = "https://onakypdwkgqfjxairstd.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWt5cGR3a2dxZmp4YWlyc3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzQxMzMsImV4cCI6MjA5NzMxMDEzM30.YeTSG2SvzNaWVbGShXVD90sYP72plAyhtmgfswK4fx8";
 
-const supabase = window.supabase.creatClient(SUAPABSE_URL, SUPABASE_ANON_KEY);
+const supabase = supabaseClient.createClient(supabaseUrl, supabaseKey)
 
-document.addEventListener('DOMContentLoaded', () => {
-  const botaoCadastrar = document.querySelector('input[value="Cadastrar"]');
+// FUNÇÃO DE CADASTRO (Ajustada para o seu botão)
+async function cadastrarUsuario(event) {
+  // Impede a página de atualizar no celular
+  if (event) event.preventDefault();
 
-  if (botaoCadastrar) {
-    botaoCadastrar.addEventListener('click', async (event) => {
-      event.preventDefault(); 
-
-      const emailInput = document.getElementById('email');
-      
-      if (!emailInput || !emailInput.value) {
-        alert('Por favor, digite um e-mail válido!');
-        return;
-      }
-
-      const emailDigitado = emailInput.value;
-
-      const { data, error } = await supabase
-        .from('adotadores') 
-        .insert([
-          { email: emailDigitado } 
-        ]);
-
-      if (error) {
-        console.error('Erro no Supabase:', error.message);
-        alert('Erro ao cadastrar e-mail: ' + error.message);
-      } else {
-        alert('E-mail cadastrado com sucesso no site!');
-        emailInput.value = ''; 
-      }
-    });
+  // Pega o e-mail digitado na caixinha
+  const emailInput = document.getElementById('email');
+  
+  if (!emailInput || !emailInput.value) {
+    alert('Por favor, digite um e-mail primeiro!');
+    return;
   }
-});
+
+  const emailDigitado = emailInput.value;
+
+  // Envia para o banco de dados
+  const { data, error } = await supabase
+    .from('adotadores')
+    .insert([
+      { email: emailDigitado }
+    ]);
+
+  if (error) {
+    alert('Erro ao cadastrar: ' + error.message);
+  } else {
+    alert('E-mail cadastrado com sucesso!');
+    emailInput.value = ''; // Limpa o campo
+  }
+}
 
 // ===== ESTADO GLOBAL =====
 let currentUser = null;
