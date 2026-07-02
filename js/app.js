@@ -1,29 +1,6 @@
-// ===== SIMULAÇÃO DE BANCO DE DADOS =====
-const database = {
-  users: [
-    { id: 1, email: 'joao@email.com', password: '123456', name: 'João Silva', userType: 'adopter' },
-    { id: 2, email: 'maria@email.com', password: '123456', name: 'Maria Santos', userType: 'ong' }
-  ],
-  adopters: [
-    { id: 1, userId: 1, phone: '(41) 99999-9999', address: 'Rua A, 123', city: 'Curitiba', state: 'PR', zipCode: '80000-000' }
-  ],
-  ongs: [
-    { id: 1, userId: 2, name: 'Abrigo Feliz', phone: '(41) 3000-0000', address: 'Rua B, 456', city: 'Curitiba', state: 'PR' }
-  ],
-  pets: [
-    { id: 1, name: 'Max', type: 'dog', breed: 'Golden Retriever', age: 2, size: 'large', city: 'Curitiba', energy: 'high', image: 'images/pet-dog-golden-1.png' },
-    { id: 2, name: 'Luna', type: 'cat', breed: 'Gato Branco', age: 1, size: 'small', city: 'Londrina', energy: 'medium', image: 'images/pet-cat-white-1.png' },
-    { id: 3, name: 'Rex', type: 'dog', breed: 'Labrador', age: 3, size: 'large', city: 'Maringá', energy: 'high', image: 'images/pet-dog-black-1.png' },
-    { id: 4, name: 'Coelho', type: 'rabbit', breed: 'Coelho Branco', age: 1, size: 'small', city: 'Ponta Grossa', energy: 'medium', image: 'images/pet-rabbit-white-1.png' },
-    { id: 5, name: 'Mimi', type: 'cat', breed: 'Gato Laranja', age: 2, size: 'small', city: 'Cascavel', energy: 'low', image: 'images/pet-cat-orange-1.png' },
-    { id: 6, name: 'Buddy', type: 'dog', breed: 'Cocker Spaniel', age: 1, size: 'medium', city: 'Foz do Iguaçu', energy: 'high', image: 'images/pet-dog-small-1.png' },
-    { id: 7, name: 'Tweety', type: 'bird', breed: 'Periquito', age: 1, size: 'small', city: 'Apucarana', energy: 'high', image: 'images/pet-bird-colorful-1.png' },
-    { id: 8, name: 'Vira-lata', type: 'dog', breed: 'Vira-lata', age: 2, size: 'medium', city: 'Paranaguá', energy: 'medium', image: 'images/pet-dog-brown-1.png' }
-  ],
-  adoptionRequests: [],
-  messages: [],
-  favorites: []
-};
+const SUPABASE_URL = "SUA_URL_DO_SUPABASE_AQUI";
+const SUPABASE_ANON_KEY = "SUA_CHAVE_ANON_AQUI";
+const supabase = window.supabase.creatClient(SUAPABSE_URL, SUPABASE_ANON_KEY);
 
 // ===== ESTADO GLOBAL =====
 let currentUser = null;
