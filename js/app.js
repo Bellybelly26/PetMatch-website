@@ -17,22 +17,27 @@ document.getElementById("bnt-cadastro").addEventListener("click", async function
     const senha = document.getElementById("senha").value;
     
         // Adicionado async/await correto para fazer a comunicação com o Supabase Auth
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password: senha,
-        });
+        try {
 
-        if (error) {
-            alert(error.message);
-            return;
-        }
-        
-        alert("Cadastro realizado com sucesso!");
-            console.log(data);
-        });
-    } catch (err) {
-        console.error(err);
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password: senha,
+    });
+
+    if (error) {
+        alert(error.message);
+        return;
     }
+
+    alert("Cadastro realizado com sucesso!");
+    console.log(data);
+
+} catch (err) {
+
+    console.error(err);
+    alert("Erro ao cadastrar.");
+
+}
 });
 
 // ===== ESTADO GLOBAL =====
