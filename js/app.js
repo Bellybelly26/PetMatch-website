@@ -111,91 +111,104 @@ function backToUserType() {
   document.getElementById('authTabs').style.display = 'none';
 }
 
-function handleLogin() {
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  const userType = document.querySelector('.user-type-card').dataset.type || 'adopter';
+async function handleLogin() {
 
-  const user = database.users.find(u => u.email === email && u.password === password);
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
 
-  if (user) {
-    currentUser = user;
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+    });
+
+    if (error) {
+        alert(error.message);
+        return;
+    }
+
+    currentUser = data.user;
+
+    localStorage.setItem(
+        "currentUser",
+        JSON.stringify(data.user)
+    );
+
     closeAuthModal();
     updateHeader();
-    showPage('home');
-    alert(`Bem-vindo, ${user.name}!`);
-  } else {
-    alert('Email ou senha incorretos!');
-  }
+    showPage("home");
 }
 
-function handleSignup() {
-  const name = document.getElementById('signupName').value;
-  const email = document.getElementById('signupEmail').value;
-  const password = document.getElementById('signupPassword').value;
-  const userType = document.querySelector('.user-type-card').dataset.type || 'adopter';
+async function handleSignup() {
 
-  if (database.users.find(u => u.email === email)) {
-    alert('Email já cadastrado!');
-    return;
-  }
+    const name = document.getElementById("signupName").value;
+    const email = document.getElementById("signupEmail").value;
+    const password = document.getElementById("signupPassword").value;
 
-  const newUser = {
-    id: database.users.length + 1,
-    email,
-    password,
-    name,
-    userType
-  };
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password
+    });
 
-  database.users.push(newUser);
-  currentUser = newUser;
-  localStorage.setItem('currentUser', JSON.stringify(newUser));
-  closeAuthModal();
-  updateHeader();
-  showPage('home');
-  alert(`Cadastro realizado com sucesso, ${name}!`);
+    if(error){
+        alert(error.message);
+        return;
+    }
+
+    await supabase
+        .from("membros")
+        .insert([{
+            nome:name,
+            email:email
+        }]);
+
+    alert("Cadastro realizado com sucesso!");
+    currentUser=data.user;
+    localStorage.setItem(
+        "currentUser",        
+        JSON.stringify(data.user)
+    );
+
+    closeAuthModal();
+    updateHeader();
+    showPage("home");
 }
 
-function handleOngSignup() {
-  const name = document.getElementById('ongName').value;
-  const email = document.getElementById('ongEmail').value;
-  const phone = document.getElementById('ongPhone').value;
-  const address = document.getElementById('ongAddress').value;
-  const city = document.getElementById('ongCity').value;
-  const password = document.getElementById('ongPassword').value;
+async function handleOngSignup(){
 
-  if (database.users.find(u => u.email === email)) {
-    alert('Email já cadastrado!');
-    return;
-  }
+    const name=document.getElementById("ongName").value;
+    const email=document.getElementById("ongEmail").value;
+    const phone=document.getElementById("ongPhone").value;
+    const address=document.getElementById("ongAddress").value;
+    const city=document.getElementById("ongCity").value;
+    const password=document.getElementById("ongPassword").value;
+    const {data,error}=await supabase.auth.signUp({
+        email,
+        password
+    });
 
-  const newUser = {
-    id: database.users.length + 1,
-    email,
-    password,
-    name,
-    userType: 'ong'
-  };
+    if(error){
+        alert(error.message);
+        return;
+    }
 
-  const newOng = {
-    id: database.ongs.length + 1,
-    userId: newUser.id,
-    name,
-    phone,
-    address,
-    city
-  };
+    await supabase
+    .from("ongs")
+    .insert([{
+        nome:name,
+        email:email,
+        telefone:phone,
+        endereco:address,
+        cidade:city
+    }]);
 
-  database.users.push(newUser);
-  database.ongs.push(newOng);
-  currentUser = newUser;
-  localStorage.setItem('currentUser', JSON.stringify(newUser));
-  closeAuthModal();
-  updateHeader();
-  showPage('ong-admin');
-  alert(`ONG cadastrada com sucesso, ${name}!`);
+    currentUser=data.user;
+    localStorage.setItem(
+        "currentUser",        JSON.stringify(data.user)
+    );
+
+    closeAuthModal();
+    updateHeader();
+    showPage("ong-admin");
 }
 
 function logout() {
