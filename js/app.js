@@ -9,26 +9,27 @@ const supabase = window.supabase.createClient(
 );
 
 // Evento do botão cadastrar
-document.getElementById('bnt-cadastro').addEventListener('click', async function(event) {
+document.getElementById("bnt-cadastro").addEventListener("click", async function(event) {
     event.preventDefault(); // Impede a página de recarregar e quebrar o fluxo
 
     // Correção: Buscando os valores digitados nos inputs corretos do HTML
-    const email = document.getElementById('email').value;
-    const senha = document.getElementById('senha').value;
-
-    try {
+    const email = document.getElementById("email").value;
+    const senha = document.getElementById("senha").value;
+    
         // Adicionado async/await correto para fazer a comunicação com o Supabase Auth
         const { data, error } = await supabase.auth.signUp({
-            email: email,
+            email,
             password: senha,
         });
 
         if (error) {
-            alert('Erro ao cadastrar: ' + error.message);
-        } else {
-            alert('Cadastro realizado com sucesso! Verifique seu e-mail.');
-            console.log(data);
+            alert(error.message);
+            return;
         }
+        
+        alert("Cadastro realizado com sucesso!");
+            console.log(data);
+        });
     } catch (err) {
         console.error(err);
     }
