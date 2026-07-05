@@ -32,7 +32,7 @@ document.getElementById('bnt-cadastro').addEventListener('click', async function
     } catch (err) {
         console.error(err);
     }
-}};
+});
 
 // ===== ESTADO GLOBAL =====
 let currentUser = null;
