@@ -28,7 +28,6 @@ document.getElementById("bnt-cadastro").addEventListener("click", async (event) 
         if (error) {
             alert(error.message);
             return;
-
         }
 
         alert("Cadastro realizado com sucesso!");
@@ -37,7 +36,6 @@ document.getElementById("bnt-cadastro").addEventListener("click", async (event) 
         console.error(err);
         alert("Erro ao cadastrar.");
     }
-
 });
 
 // ===== ESTADO GLOBAL =====
