@@ -1,43 +1,43 @@
 const SUPABASE_URL = "https://onakypdwkgqfjxairstd.supabase.co";
 
-const SUPABASE_ANON_KEY =
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWt5cGR3a2dxZmp4YWlyc3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzQxMzMsImV4cCI6MjA5NzMxMDEzM30.YeTSG2SvzNaWVbGShXVD90sYP72plAyhtmgfswK4fx8";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWt5cGR3a2dxZmp4YWlyc3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzQxMzMsImV4cCI6MjA5NzMxMDEzM30.YeTSG2SvzNaWVbGShXVD90sYP72plAyhtmgfswK4fx8";
 
 const supabase = window.supabase.createClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY
 );
 
-// Evento do botão cadastrar
-document.getElementById("bnt-cadastro").addEventListener("click", async function(event) {
-    event.preventDefault(); // Impede a página de recarregar e quebrar o fluxo
+// Cadastro
+document.getElementById("bnt-cadastro").addEventListener("click", async (event) => {
+    event.preventDefault();
 
-    // Correção: Buscando os valores digitados nos inputs corretos do HTML
-    const email = document.getElementById("email").value;
-    const senha = document.getElementById("senha").value;
-    
-        // Adicionado async/await correto para fazer a comunicação com o Supabase Auth
-        try {
+    try {
+        const email = document.getElementById("email").value.trim();
+        const senha = document.getElementById("senha").value;
 
-    const { data, error } = await supabase.auth.signUp({
-        email,
-        password: senha,
-    });
+        if (!email || !senha) {
+            alert("Preencha todos os campos.");
+            return;
+        }
 
-    if (error) {
-        alert(error.message);
-        return;
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password: senha
+        });
+
+        if (error) {
+            alert(error.message);
+            return;
+
+        }
+
+        alert("Cadastro realizado com sucesso!");
+        console.log(data);
+    } catch (err) {
+        console.error(err);
+        alert("Erro ao cadastrar.");
     }
 
-    alert("Cadastro realizado com sucesso!");
-    console.log(data);
-
-} catch (err) {
-
-    console.error(err);
-    alert("Erro ao cadastrar.");
-
-}
 });
 
 // ===== ESTADO GLOBAL =====
