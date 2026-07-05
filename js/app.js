@@ -1,42 +1,29 @@
-const SUPABASE_URL = "https://onakypdwkgqfjxairstd.supabase.co";
-
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWt5cGR3a2dxZmp4YWlyc3RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzQxMzMsImV4cCI6MjA5NzMxMDEzM30.YeTSG2SvzNaWVbGShXVD90sYP72plAyhtmgfswK4fx8";
-
-const supabase = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-);
-
-// Cadastro
-document.getElementById("bnt-cadastro").addEventListener("click", async (event) => {
-    event.preventDefault();
-
-    try {
-        const email = document.getElementById("email").value.trim();
-        const senha = document.getElementById("senha").value;
-
-        if (!email || !senha) {
-            alert("Preencha todos os campos.");
-            return;
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password: senha
-        });
-
-        if (error) {
-            alert(error.message);
-            return;
-        }
-
-        alert("Cadastro realizado com sucesso!");
-        console.log(data);
-    } catch (err) {
-        console.error(err);
-        alert("Erro ao cadastrar.");
-    }
-});
+// ===== SIMULAÇÃO DE BANCO DE DADOS =====
+const database = {
+  users: [
+    { id: 1, email: 'joao@email.com', password: '123456', name: 'João Silva', userType: 'adopter' },
+    { id: 2, email: 'maria@email.com', password: '123456', name: 'Maria Santos', userType: 'ong' }
+  ],
+  adopters: [
+    { id: 1, userId: 1, phone: '(41) 99999-9999', address: 'Rua A, 123', city: 'Curitiba', state: 'PR', zipCode: '80000-000' }
+  ],
+  ongs: [
+    { id: 1, userId: 2, name: 'Abrigo Feliz', phone: '(41) 3000-0000', address: 'Rua B, 456', city: 'Curitiba', state: 'PR' }
+  ],
+  pets: [
+    { id: 1, name: 'Max', type: 'dog', breed: 'Golden Retriever', age: 2, size: 'large', city: 'Curitiba', energy: 'high', image: 'images/pet-dog-golden-1.png' },
+    { id: 2, name: 'Luna', type: 'cat', breed: 'Gato Branco', age: 1, size: 'small', city: 'Londrina', energy: 'medium', image: 'images/pet-cat-white-1.png' },
+    { id: 3, name: 'Rex', type: 'dog', breed: 'Labrador', age: 3, size: 'large', city: 'Maringá', energy: 'high', image: 'images/pet-dog-black-1.png' },
+    { id: 4, name: 'Coelho', type: 'rabbit', breed: 'Coelho Branco', age: 1, size: 'small', city: 'Ponta Grossa', energy: 'medium', image: 'images/pet-rabbit-white-1.png' },
+    { id: 5, name: 'Mimi', type: 'cat', breed: 'Gato Laranja', age: 2, size: 'small', city: 'Cascavel', energy: 'low', image: 'images/pet-cat-orange-1.png' },
+    { id: 6, name: 'Buddy', type: 'dog', breed: 'Cocker Spaniel', age: 1, size: 'medium', city: 'Foz do Iguaçu', energy: 'high', image: 'images/pet-dog-small-1.png' },
+    { id: 7, name: 'Tweety', type: 'bird', breed: 'Periquito', age: 1, size: 'small', city: 'Apucarana', energy: 'high', image: 'images/pet-bird-colorful-1.png' },
+    { id: 8, name: 'Vira-lata', type: 'dog', breed: 'Vira-lata', age: 2, size: 'medium', city: 'Paranaguá', energy: 'medium', image: 'images/pet-dog-brown-1.png' }
+  ],
+  adoptionRequests: [],
+  messages: [],
+  favorites: []
+};
 
 // ===== ESTADO GLOBAL =====
 let currentUser = null;
@@ -111,104 +98,91 @@ function backToUserType() {
   document.getElementById('authTabs').style.display = 'none';
 }
 
-async function handleLogin() {
+function handleLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  const userType = document.querySelector('.user-type-card').dataset.type || 'adopter';
 
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
+  const user = database.users.find(u => u.email === email && u.password === password);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-    });
-
-    if (error) {
-        alert(error.message);
-        return;
-    }
-
-    currentUser = data.user;
-
-    localStorage.setItem(
-        "currentUser",
-        JSON.stringify(data.user)
-    );
-
+  if (user) {
+    currentUser = user;
+    localStorage.setItem('currentUser', JSON.stringify(user));
     closeAuthModal();
     updateHeader();
-    showPage("home");
+    showPage('home');
+    alert(`Bem-vindo, ${user.name}!`);
+  } else {
+    alert('Email ou senha incorretos!');
+  }
 }
 
-async function handleSignup() {
+function handleSignup() {
+  const name = document.getElementById('signupName').value;
+  const email = document.getElementById('signupEmail').value;
+  const password = document.getElementById('signupPassword').value;
+  const userType = document.querySelector('.user-type-card').dataset.type || 'adopter';
 
-    const name = document.getElementById("signupName").value;
-    const email = document.getElementById("signupEmail").value;
-    const password = document.getElementById("signupPassword").value;
+  if (database.users.find(u => u.email === email)) {
+    alert('Email já cadastrado!');
+    return;
+  }
 
-    const { data, error } = await supabase.auth.signUp({
-        email,
-        password
-    });
+  const newUser = {
+    id: database.users.length + 1,
+    email,
+    password,
+    name,
+    userType
+  };
 
-    if(error){
-        alert(error.message);
-        return;
-    }
-
-    await supabase
-        .from("membros")
-        .insert([{
-            nome:name,
-            email:email
-        }]);
-
-    alert("Cadastro realizado com sucesso!");
-    currentUser=data.user;
-    localStorage.setItem(
-        "currentUser",        
-        JSON.stringify(data.user)
-    );
-
-    closeAuthModal();
-    updateHeader();
-    showPage("home");
+  database.users.push(newUser);
+  currentUser = newUser;
+  localStorage.setItem('currentUser', JSON.stringify(newUser));
+  closeAuthModal();
+  updateHeader();
+  showPage('home');
+  alert(`Cadastro realizado com sucesso, ${name}!`);
 }
 
-async function handleOngSignup(){
+function handleOngSignup() {
+  const name = document.getElementById('ongName').value;
+  const email = document.getElementById('ongEmail').value;
+  const phone = document.getElementById('ongPhone').value;
+  const address = document.getElementById('ongAddress').value;
+  const city = document.getElementById('ongCity').value;
+  const password = document.getElementById('ongPassword').value;
 
-    const name=document.getElementById("ongName").value;
-    const email=document.getElementById("ongEmail").value;
-    const phone=document.getElementById("ongPhone").value;
-    const address=document.getElementById("ongAddress").value;
-    const city=document.getElementById("ongCity").value;
-    const password=document.getElementById("ongPassword").value;
-    const {data,error}=await supabase.auth.signUp({
-        email,
-        password
-    });
+  if (database.users.find(u => u.email === email)) {
+    alert('Email já cadastrado!');
+    return;
+  }
 
-    if(error){
-        alert(error.message);
-        return;
-    }
+  const newUser = {
+    id: database.users.length + 1,
+    email,
+    password,
+    name,
+    userType: 'ong'
+  };
 
-    await supabase
-    .from("ongs")
-    .insert([{
-        nome:name,
-        email:email,
-        telefone:phone,
-        endereco:address,
-        cidade:city
-    }]);
+  const newOng = {
+    id: database.ongs.length + 1,
+    userId: newUser.id,
+    name,
+    phone,
+    address,
+    city
+  };
 
-    currentUser=data.user;
-    localStorage.setItem(
-        "currentUser",        JSON.stringify(data.user)
-    );
-
-    closeAuthModal();
-    updateHeader();
-    showPage("ong-admin");
+  database.users.push(newUser);
+  database.ongs.push(newOng);
+  currentUser = newUser;
+  localStorage.setItem('currentUser', JSON.stringify(newUser));
+  closeAuthModal();
+  updateHeader();
+  showPage('ong-admin');
+  alert(`ONG cadastrada com sucesso, ${name}!`);
 }
 
 function logout() {
@@ -602,4 +576,4 @@ function renderAdminVisits() {
 
 function openAddPetForm() {
   alert('Formulário de adição de pet (em desenvolvimento)');
-}
+      }
