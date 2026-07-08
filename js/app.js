@@ -8,232 +8,585 @@ const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let usuarioLogado = null;
 
-// ============================================================================
-// AUTENTICAÇÃO E RELACIONAMENTO ENTRE TABELAS (usuarios, adotadores, ongs)
-// ============================================================================
+// FUNÇÃO DE CADASTRO (Ajustada para o seu botão)
+async function cadastrarUsuario(event) {
+  // Impede a página de atualizar no celular
+  if (event) event.preventDefault();
 
-// Monitora o estado da sessão de usuário em tempo real
-supabase.auth.onAuthStateChange((event, session) => {
-    if (session) {
-        usuarioLogado = session.user;
-        document.getElementById('menu-autenticacao').style.display = 'none';
-        document.getElementById('menu-usuario').style.display = 'block';
-        document.getElementById('aviso-autenticacao-painel').style.display = 'none';
-        document.getElementById('conteudo-painel-protegido').style.display = 'block';
-        carregarDadosPainel();
-    } else {
-        usuarioLogado = null;
-        document.getElementById('menu-autenticacao').style.display = 'block';
-        document.getElementById('menu-usuario').style.display = 'none';
-        document.getElementById('aviso-autenticacao-painel').style.display = 'block';
-        document.getElementById('conteudo-painel-protegido').style.display = 'none';
-    }
-});
+  // Pega o e-mail digitado na caixinha
+  const emailInput = document.getElementById('email');
+  
+  if (!emailInput || !emailInput.value) {
+    alert('Por favor, digite um e-mail primeiro!');
+    return;
+  }
 
-// Evento de Login (Validação + Autenticação)
-document.getElementById('form-login').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
-    const senha = document.getElementById('login-senha').value;
+  const emailDigitado = emailInput.value;
 
-    if (!email || !senha) {
-        alert("Preencha todos os campos obrigatórios.");
-        return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-
-    if (error) {
-        alert("Erro de autenticação: " + error.message);
-    } else {
-        alert("Acesso concedido com sucesso!");
-        alternarTela('inicio');
-    }
-});
-
-// Evento de Cadastro Transacional (Auth -> usuarios -> adotadores/ongs)
-document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const tipo = document.getElementById('cad-tipo').value; // 'adotador' ou 'ong'
-    const nome = document.getElementById('cad-nome').value.trim();
-    const email = document.getElementById('cad-email').value.trim();
-    const senha = document.getElementById('cad-senha').value;
-
-    // Validações estruturais de integridade
-    if (nome.length < 3) {
-        alert("O nome precisa conter pelo menos 3 caracteres.");
-        return;
-    }
-    if (senha.length < 6) {
-        alert("A senha precisa conter no mínimo 6 dígitos.");
-        return;
-    }
-
-    // 1. Cria credencial de login oficial no Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password: senha });
-
-    if (authError) {
-        alert("Erro no serviço de autenticação: " + authError.message);
-        return;
-    }
-
-    if (authData.user) {
-        const userId = authData.user.id;
-
-        // 2. Insere o registro centralizador na tabela 'usuarios'
-        const { error: userTableError } = await supabase
-            .from('usuarios')
-            .insert([{ id: userId, email: email, tipo_usuario: tipo }]);
-
-        if (userTableError) {
-            alert("Erro ao sincronizar tabela 'usuarios': " + userTableError.message);
-            return;
-        }
-
-        // 3. Destina as informações complementares para a tabela correta ('adotadores' ou 'ongs')
-        const tabelaDestino = tipo === 'adotador' ? 'adotadores' : 'ongs';
-        const { error: perfilError } = await supabase
-            .from(tabelaDestino)
-            .insert([{ id: userId, nome: nome }]);
-
-        if (perfilError) {
-            alert(`Usuário criado, mas falhou ao alimentar dados na tabela '${tabelaDestino}': ` + perfilError.message);
-        } else {
-            alert("Cadastro concluído com sucesso em todas as tabelas! Realize o login.");
-            document.getElementById('form-cadastro').reset();
-            alternarAbasAuth('login');
-        }
-    }
-});
-
-// Encerramento de sessão
-async function deslogarUsuario() {
-    await supabase.auth.signOut();
-    alert("Sessão finalizada.");
-    alternarTela('inicio');
-}
-
-// ============================================================================
-// CRUD OPERAÇÕES: TABELA [pets]
-// ============================================================================
-
-// GET - Listar todos os pets para adoção na vitrine pública
-async function carregarPets() {
-    const container = document.getElementById('container-vitrine-pets');
-    container.innerHTML = "<p>Buscando lista de pets ativos...</p>";
-
-    const { data, error } = await supabase.from('pets').select('*');
-
-    if (error) {
-        container.innerHTML = `<p style="color:red;">Falha na leitura dos dados: ${error.message}</p>`;
-        return;
-    }
-
-    container.innerHTML = "";
-    if (data.length === 0) {
-        container.innerHTML = "<p>Nenhum pet cadastrado para adoção no momento.</p>";
-        return;
-    }
-
-    data.forEach(pet => {
-        const card = document.createElement('div');
-        card.style = "border: 1px solid #ddd; border-radius: 8px; padding: 15px; width: 220px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background:#fff;";
-        card.innerHTML = `
-            <div style="font-size: 40px; margin-bottom: 10px;">🐾</div>
-            <h3>${pet.nome}</h3>
-            <p><strong>Espécie:</strong> ${pet.especie}</p>
-            <p><strong>Idade:</strong> ${pet.idade} ano(s)</p>
-            <button onclick="criarSolicitacaoAdocao('${pet.id}')" style="background-color:#28a745; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%; font-weight:bold; margin-top:10px;">Quero Adotar</button>
-        `;
-        container.appendChild(card);
-    });
-}
-
-// POST & PUT - Criação ou Edição de Pets
-document.getElementById('form-crud-pet').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('pet-id-edicao').value;
-    const nome = document.getElementById('pet-nome').value.trim();
-    const especie = document.getElementById('pet-especie').value.trim();
-    const idade = parseInt(document.getElementById('pet-idade').value);
-
-    if (id) {
-        // Atualização cadastral (PUT)
-        const { error } = await supabase.from('pets').update({ nome, especie, idade }).eq('id', id);
-        if (error) alert("Erro ao atualizar registro do pet: " + error.message);
-        else alert("Alterações gravadas com sucesso!");
-    } else {
-        // Criação de novo pet (POST)
-        const { error } = await supabase.from('pets').insert([{ nome, especie, idade }]);
-        if (error) alert("Erro ao inserir novo pet: " + error.message);
-        else alert("Pet inserido no sistema com sucesso!");
-    }
-
-    limparFormularioPet();
-    carregarDadosPainel();
-    carregarPets();
-});
-
-// DELETE - Remover pet definitivamente da tabela
-async function deletarPet(id) {
-    if (!confirm("Confirmar exclusão permanente deste pet?")) return;
-
-    const { error } = await supabase.from('pets').delete().eq('id', id);
-    if (error) alert("Não foi possível excluir: " + error.message);
-    else {
-        alert("Pet excluído com sucesso.");
-        carregarDadosPainel();
-        carregarPets();
-    }
-}
-
-// Passar dados da listagem para as caixas de texto para edição
-function iniciarEdicaoPet(id, nome, especie, idade) {
-    document.getElementById('pet-id-edicao').value = id;
-    document.getElementById('pet-nome').value = nome;
-    document.getElementById('pet-especie').value = especie;
-    document.getElementById('pet-idade').value = idade;
-    document.getElementById('btn-salvar-pet').innerText = "Atualizar Registro (PUT)";
-    document.getElementById('btn-cancelar-pet').style.display = "inline-block";
-}
-
-function limparFormularioPet() {
-    document.getElementById('form-crud-pet').reset();
-    document.getElementById('pet-id-edicao').value = "";
-    document.getElementById('btn-salvar-pet').innerText = "Salvar Registro";
-    document.getElementById('btn-cancelar-pet').style.display = "none";
-}
-
-// ============================================================================
-// CRUD OPERAÇÕES: TABELA [solicitacoes_adocao]
-// ============================================================================
-
-// POST - Criar uma solicitação vinculada ao ID do Pet
-async function criarSolicitacaoAdocao(idPet) {
-    const nomeAdotador = prompt("Por favor, digite seu Nome Completo para registrar a solicitação:");
-    const contato = prompt("Digite seu Telefone ou E-mail para que a ONG retorne:");
-
-    if (!nomeAdotador || !contato) {
-        alert("Operação negada. Informações para contato são obrigatórias.");
-        return;
-    }
-
-    const { error } = await supabase.from('solicitacoes_adocao').insert([
-        { pet_id: idPet, nome_solicitante: nomeAdotador, dados_contato: contato, status: "Em Análise" }
+  // Envia para o banco de dados
+  const { data, error } = await supabase
+    .from('adotadores')
+    .insert([
+      { email: emailDigitado }
     ]);
 
-    if (error) alert("Falha ao registrar intenção de adoção: " + error.message);
-    else alert("Sua solicitação foi registrada! Acompanhe no painel de controle.");
+  if (error) {
+    alert('Erro ao cadastrar: ' + error.message);
+  } else {
+    alert('E-mail cadastrado com sucesso!');
+    emailInput.value = ''; // Limpa o campo
+  }
 }
 
-// PUT - Alterar o status (Aprovar / Recusar pedido de adoção)
-async function alterarStatusSolicitacao(idSolicitacao, statusAtualizado) {
-    const { error } = await supabase.from('solicitacoes_adocao').update({ status: statusAtualizado }).eq('id', idSolicitacao);
-    if (error) alert("Erro ao atualizar status do pedido: " + error.message);
-    else {
-        alert(`Status atualizado para: ${statusAtualizado}`);
-        carregarDadosPainel();
+// ===== ESTADO GLOBAL =====
+let currentUser = null;
+let currentPage = 'home';
+let currentCarouselIndex = 0;
+let currentTestimonialIndex = 0;
+let currentAdminTab = 'dashboard';
+let currentChatId = null;
+
+// ===== INICIALIZAÇÃO =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadUserFromStorage();
+  showPage('home');
+  animateCounters();
+  startCarouselAutoPlay();
+  startTestimonialAutoPlay();
+  renderPets();
+});
+
+// ===== AUTENTICAÇÃO =====
+function openAuthModal() {
+  document.getElementById('authModal').classList.add('active');
+  document.getElementById('userTypeSelection').style.display = 'block';
+  document.getElementById('authTabs').style.display = 'none';
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').classList.remove('active');
+}
+
+function selectUserType(type) {
+  document.getElementById('userTypeSelection').style.display = 'none';
+  document.getElementById('authTabs').style.display = 'block';
+  
+  // Armazenar tipo de usuário
+  const authTabs = document.getElementById('authTabs');
+  authTabs.dataset.type = type;
+  
+  // Mostrar formulário correto no signup
+  if (type === 'ong') {
+    document.getElementById('adopterSignupForm').style.display = 'none';
+    document.getElementById('ongSignupForm').style.display = 'block';
+  } else {
+    document.getElementById('adopterSignupForm').style.display = 'block';
+    document.getElementById('ongSignupForm').style.display = 'none';
+  }
+  
+  switchAuthTab('login');
+}
+
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.auth-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('auth-' + tab).classList.add('active');
+  document.querySelector(`[onclick="switchAuthTab('${tab}')"]`).classList.add('active');
+  
+  // Se for signup, mostrar o formulário correto
+  if (tab === 'signup') {
+    const userType = document.querySelector('[data-type]')?.dataset.type || 'adopter';
+    if (userType === 'ong') {
+      document.getElementById('adopterSignupForm').style.display = 'none';
+      document.getElementById('ongSignupForm').style.display = 'block';
+    } else {
+      document.getElementById('adopterSignupForm').style.display = 'block';
+      document.getElementById('ongSignupForm').style.display = 'none';
     }
+  }
 }
 
-// DELETE - Remover pedido da listagem administrativaasync function recusarEDeletarSolicitacao(idSolicitacao) {if (!confirm("Deseja expurgar essa solicitação do histórico?")) return;const { error } = await supabase.from('solicitacoes_adocao').delete().eq('id', idSolicitacao);if (error) alert("Erro ao excluir: " + error.message);else {alert("Solicitação excluída com sucesso.");carregarDadosPainel();}}// ============================================================================// SISTEMA DE RENDERIZAÇÃO DO PAINEL GERAL (GET COMBINADO)// ============================================================================async function carregarDadosPainel() {if (!usuarioLogado) return;// 1. Atualizar Tabela de Controle de Petsconst tbodyPets = document.querySelector('#tabela-gerencia-pets tbody');tbodyPets.innerHTML = "Sincronizando...";const { data: listagemPets, error: errPets } = await supabase.from('pets').select('*');if (!errPets && listagemPets) {tbodyPets.innerHTML = "";listagemPets.forEach(p => {const tr = document.createElement('tr');tr.innerHTML = <td style="padding: 8px;">${p.nome}</td> <td style="padding: 8px;">${p.especie}</td> <td style="padding: 8px;"> <button onclick="iniciarEdicaoPet('${p.id}', '${p.nome}', '${p.especie}', ${p.idade})" style="color: blue; cursor:pointer; background:none; border:none; padding:0 5px;">Editar</button> <button onclick="deletarPet('${p.id}')" style="color: red; cursor:pointer; background:none; border:none; padding:0 5px;">Excluir</button> </td>;tbodyPets.appendChild(tr);});}// 2. Atualizar Tabela de Solicitações de Adoçãoconst tbodySolicitacoes = document.querySelector('#tabela-gerencia-solicitacoes tbody');tbodySolicitacoes.innerHTML = "Sincronizando...";const { data: listagemSolicitacoes, error: errSolicitacoes } = await supabase.from('solicitacoes_adocao').select('*');if (!errSolicitacoes && listagemSolicitacoes) {tbodySolicitacoes.innerHTML = "";listagemSolicitacoes.forEach(s => {const tr = document.createElement('tr');tr.innerHTML = <td style="padding: 8px;">${s.nome_solicitante}</td> <td style="padding: 8px;">${s.dados_contato}</td> <td style="padding: 8px; font-weight:bold;">${s.status}</td> <td style="padding: 8px;"> <button onclick="alterarStatusSolicitacao('${s.id}', 'Aprovada')" style="color: green; cursor:pointer; background:none; border:none;">Aceitar</button> <button onclick="alterarStatusSolicitacao('${s.id}', 'Recusada')" style="color: orange; cursor:pointer; background:none; border:none; margin: 0 4px;">Recusar</button> <button onclick="recusarEDeletarSolicitacao('${s.id}')" style="color: red; cursor:pointer; background:none; border:none; font-weight:bold;">X</button> </td>;tbodySolicitacoes.appendChild(tr);});}}// ============================================================================// NAVEGAÇÃO E REGRAS DE ALTERNÂNCIA DE TELAS// ============================================================================function alternarTela(idTela) {document.querySelectorAll('.section-container').forEach(sec => sec.style.display = 'none');document.getElementById(tela-${idTela}).style.display = 'block';if (idTela === 'animais') carregarPets();if (idTela === 'gerenciamento') carregarDadosPainel();}function alternarAbasAuth(aba) {if (aba === 'login') {document.getElementById('form-login').style.display = 'block';document.getElementById('form-cadastro').style.display = 'none';document.getElementById('btn-tab-login').style.fontWeight = 'bold';document.getElementById('btn-tab-cadastro').style.fontWeight = 'normal';} else {document.getElementById('form-login').style.display = 'none';document.getElementById('form-cadastro').style.display = 'block';document.getElementById('btn-tab-login').style.fontWeight = 'normal';document.getElementById('btn-tab-cadastro').style.fontWeight = 'bold';}}// Inicialização automática ao carregar a páginawindow.addEventListener('DOMContentLoaded', () => {carregarPets();});
+function backToUserType() {
+  document.getElementById('userTypeSelection').style.display = 'block';
+  document.getElementById('authTabs').style.display = 'none';
+}
+
+function handleLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  const userType = document.querySelector('.user-type-card').dataset.type || 'adopter';
+
+  const user = database.users.find(u => u.email === email && u.password === password);
+
+  if (user) {
+    currentUser = user;
+    localStorage.setItem('currentUser', JSON.stringify(user));
+    closeAuthModal();
+    updateHeader();
+    showPage('home');
+    alert(`Bem-vindo, ${user.name}!`);
+  } else {
+    alert('Email ou senha incorretos!');
+  }
+}
+
+function handleSignup() {
+  const name = document.getElementById('signupName').value;
+  const email = document.getElementById('signupEmail').value;
+  const password = document.getElementById('signupPassword').value;
+  const userType = document.querySelector('.user-type-card').dataset.type || 'adopter';
+
+  if (database.users.find(u => u.email === email)) {
+    alert('Email já cadastrado!');
+    return;
+  }
+
+  const newUser = {
+    id: database.users.length + 1,
+    email,
+    password,
+    name,
+    userType
+  };
+
+  database.users.push(newUser);
+  currentUser = newUser;
+  localStorage.setItem('currentUser', JSON.stringify(newUser));
+  closeAuthModal();
+  updateHeader();
+  showPage('home');
+  alert(`Cadastro realizado com sucesso, ${name}!`);
+}
+
+function handleOngSignup() {
+  const name = document.getElementById('ongName').value;
+  const email = document.getElementById('ongEmail').value;
+  const phone = document.getElementById('ongPhone').value;
+  const address = document.getElementById('ongAddress').value;
+  const city = document.getElementById('ongCity').value;
+  const password = document.getElementById('ongPassword').value;
+
+  if (database.users.find(u => u.email === email)) {
+    alert('Email já cadastrado!');
+    return;
+  }
+
+  const newUser = {
+    id: database.users.length + 1,
+    email,
+    password,
+    name,
+    userType: 'ong'
+  };
+
+  const newOng = {
+    id: database.ongs.length + 1,
+    userId: newUser.id,
+    name,
+    phone,
+    address,
+    city
+  };
+
+  database.users.push(newUser);
+  database.ongs.push(newOng);
+  currentUser = newUser;
+  localStorage.setItem('currentUser', JSON.stringify(newUser));
+  closeAuthModal();
+  updateHeader();
+  showPage('ong-admin');
+  alert(`ONG cadastrada com sucesso, ${name}!`);
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('currentUser');
+  updateHeader();
+  showPage('home');
+  document.getElementById('profileMenu').style.display = 'none';
+  alert('Você foi desconectado!');
+}
+
+function loadUserFromStorage() {
+  const stored = localStorage.getItem('currentUser');
+  if (stored) {
+    currentUser = JSON.parse(stored);
+    updateHeader();
+  }
+}
+
+function updateHeader() {
+  const btnLogin = document.getElementById('btnLogin');
+  const btnProfile = document.getElementById('btnProfile');
+  const ongAdminLink = document.getElementById('ongAdminLink');
+
+  if (currentUser) {
+    btnLogin.style.display = 'none';
+    btnProfile.style.display = 'block';
+    document.getElementById('userName').textContent = currentUser.name;
+    
+    // Mostrar painel ONG apenas se o usuário for ONG
+    if (currentUser.userType === 'ong') {
+      ongAdminLink.style.display = 'block';
+    } else {
+      ongAdminLink.style.display = 'none';
+    }
+  } else {
+    btnLogin.style.display = 'block';
+    btnProfile.style.display = 'none';
+    ongAdminLink.style.display = 'none';
+  }
+}
+
+function toggleProfileMenu() {
+  const menu = document.getElementById('profileMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.btn-profile') && !e.target.closest('.profile-menu')) {
+    document.getElementById('profileMenu').style.display = 'none';
+  }
+});
+
+// ===== NAVEGAÇÃO =====
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  currentPage = page;
+
+  if (page === 'pets') {
+    renderPets();
+  } else if (page === 'my-requests') {
+    renderMyRequests();
+  } else if (page === 'chat') {
+    renderChatList();
+  } else if (page === 'ong-admin') {
+    updateAdminDashboard();
+  }
+
+  window.scrollTo(0, 0);
+}
+
+// ===== CAROUSEL =====
+function nextCarousel() {
+  currentCarouselIndex = (currentCarouselIndex + 1) % 2;
+  updateCarousel();
+}
+
+function prevCarousel() {
+  currentCarouselIndex = (currentCarouselIndex - 1 + 2) % 2;
+  updateCarousel();
+}
+
+function updateCarousel() {
+  document.querySelectorAll('.carousel-item').forEach((item, i) => {
+    item.classList.toggle('active', i === currentCarouselIndex);
+  });
+  document.getElementById('carouselIndicator').textContent = `${currentCarouselIndex + 1} / 2`;
+}
+
+function startCarouselAutoPlay() {
+  setInterval(() => {
+    nextCarousel();
+  }, 6000);
+}
+
+// ===== TESTIMONIALS =====
+function switchTestimonial(index) {
+  currentTestimonialIndex = index;
+  updateTestimonials();
+}
+
+function updateTestimonials() {
+  document.querySelectorAll('.testimonial').forEach((t, i) => {
+    t.classList.toggle('active', i === currentTestimonialIndex);
+  });
+  document.querySelectorAll('.indicator').forEach((ind, i) => {
+    ind.classList.toggle('active', i === currentTestimonialIndex);
+  });
+}
+
+function startTestimonialAutoPlay() {
+  setInterval(() => {
+    currentTestimonialIndex = (currentTestimonialIndex + 1) % 3;
+    updateTestimonials();
+  }, 5000);
+}
+
+// ===== CONTADORES ANIMADOS =====
+function animateCounters() {
+  document.querySelectorAll('.counter').forEach(counter => {
+    const target = parseInt(counter.dataset.target);
+    let current = 0;
+    const increment = target / 50;
+
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= target) {
+        counter.textContent = target.toLocaleString();
+        clearInterval(timer);
+      } else {
+        counter.textContent = Math.floor(current).toLocaleString();
+      }
+    }, 30);
+  });
+}
+
+// ===== PETS PAGE =====
+function renderPets() {
+  const grid = document.getElementById('petsGrid');
+  grid.innerHTML = '';
+
+  let pets = [...database.pets];
+
+  // Aplicar filtros
+  const typeFilter = document.getElementById('filterType')?.value;
+  const sizeFilter = document.getElementById('filterSize')?.value;
+  const locationFilter = document.getElementById('filterLocation')?.value.toLowerCase();
+  const searchFilter = document.getElementById('filterSearch')?.value.toLowerCase();
+  const favoritesOnly = document.getElementById('filterFavorites')?.checked;
+
+  if (typeFilter) pets = pets.filter(p => p.type === typeFilter);
+  if (sizeFilter) pets = pets.filter(p => p.size === sizeFilter);
+  if (locationFilter) pets = pets.filter(p => p.city.toLowerCase().includes(locationFilter));
+  if (searchFilter) pets = pets.filter(p => p.name.toLowerCase().includes(searchFilter) || p.breed.toLowerCase().includes(searchFilter));
+  if (favoritesOnly) pets = pets.filter(p => database.favorites.includes(p.id));
+
+  pets.forEach(pet => {
+    const isFavorite = database.favorites.includes(pet.id);
+    const card = document.createElement('div');
+    card.className = 'pet-card';
+    card.innerHTML = `
+      <img src="${pet.image}" alt="${pet.name}" class="pet-image">
+      <div class="pet-info">
+        <div class="pet-name">${pet.name}</div>
+        <div class="pet-details">${pet.breed}</div>
+        <div class="pet-details">${pet.age} anos • ${pet.size}</div>
+        <div class="pet-details">📍 ${pet.city}</div>
+        <div class="pet-actions">
+          <button class="btn-favorite ${isFavorite ? 'active' : ''}" onclick="toggleFavorite(${pet.id})">
+            ${isFavorite ? '❤️' : '🤍'}
+          </button>
+          <button class="btn-adopt" onclick="openPetDetail(${pet.id})">Detalhes</button>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function filterPets() {
+  renderPets();
+}
+
+function toggleFavorite(petId) {
+  const index = database.favorites.indexOf(petId);
+  if (index > -1) {
+    database.favorites.splice(index, 1);
+  } else {
+    database.favorites.push(petId);
+  }
+  renderPets();
+}
+
+function openPetDetail(petId) {
+  const pet = database.pets.find(p => p.id === petId);
+  const modal = document.getElementById('petDetailModal');
+  const content = document.getElementById('petDetailContent');
+
+  content.innerHTML = `
+    <h2>${pet.name}</h2>
+    <img src="${pet.image}" alt="${pet.name}" style="width:100%; border-radius:12px; margin:1rem 0;">
+    <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin: 1rem 0;">
+      <p><strong>Raça:</strong> ${pet.breed}</p>
+      <p><strong>Idade:</strong> ${pet.age} anos</p>
+      <p><strong>Tamanho:</strong> ${pet.size}</p>
+      <p><strong>Energia:</strong> ${pet.energy}</p>
+      <p><strong>Localização:</strong> ${pet.city}, PR</p>
+    </div>
+    <div style="margin: 1rem 0;">
+      <h3>Sobre ${pet.name}</h3>
+      <p>Um lindo ${pet.breed} procurando por um lar amoroso. Está vacinado e pronto para adoção!</p>
+    </div>
+    <button class="btn-primary" style="width:100%; margin-bottom:0.5rem;" onclick="requestAdoption(${pet.id})">Quero Adotar!</button>
+    <button class="btn-secondary" style="width:100%;" onclick="closePetDetailModal()">Fechar</button>
+  `;
+
+  modal.classList.add('active');
+}
+
+function closePetDetailModal() {
+  document.getElementById('petDetailModal').classList.remove('active');
+}
+
+function requestAdoption(petId) {
+  if (!currentUser) {
+    alert('Faça login para solicitar adoção!');
+    openAuthModal();
+    return;
+  }
+
+  const pet = database.pets.find(p => p.id === petId);
+  const request = {
+    id: database.adoptionRequests.length + 1,
+    petId,
+    petName: pet.name,
+    adopterId: currentUser.id,
+    adopterName: currentUser.name,
+    status: 'pending',
+    date: new Date().toLocaleDateString()
+  };
+
+  database.adoptionRequests.push(request);
+  closePetDetailModal();
+  alert(`Solicitação de adoção enviada para ${pet.name}!`);
+}
+
+// ===== PERFIL DE ADOTADOR =====
+function saveAdopterProfile(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+
+  alert('Perfil salvo com sucesso!');
+  showPage('home');
+}
+
+function previewProfilePhoto() {
+  const file = document.getElementById('profilePhoto').files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const preview = document.getElementById('profilePhotoPreview');
+      preview.innerHTML = `<img src="${e.target.result}" style="max-width:200px; border-radius:12px;">`;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function previewResidencePhotos() {
+  const files = document.getElementById('residencePhotos').files;
+  const preview = document.getElementById('residencePhotosPreview');
+  preview.innerHTML = '';
+
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'max-width:150px; margin:0.5rem; border-radius:8px;';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function previewResidenceVideos() {
+  const files = document.getElementById('residenceVideos').files;
+  const preview = document.getElementById('residenceVideosPreview');
+  preview.innerHTML = '';
+
+  Array.from(files).forEach(file => {
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(file);
+    video.style.cssText = 'max-width:150px; margin:0.5rem; border-radius:8px;';
+    video.controls = true;
+    preview.appendChild(video);
+  });
+}
+
+// ===== MINHAS SOLICITAÇÕES =====
+function renderMyRequests() {
+  if (!currentUser) return;
+
+  const list = document.getElementById('requestsList');
+  const myRequests = database.adoptionRequests.filter(r => r.adopterId === currentUser.id);
+
+  if (myRequests.length === 0) {
+    list.innerHTML = '<p style="text-align:center; color:#999;">Você ainda não fez nenhuma solicitação.</p>';
+    return;
+  }
+
+  list.innerHTML = myRequests.map(req => `
+    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border-left: 4px solid var(--primary-blue);">
+      <h3>${req.petName}</h3>
+      <p><strong>Status:</strong> <span style="color: ${req.status === 'approved' ? 'green' : req.status === 'rejected' ? 'red' : 'orange'};">${req.status}</span></p>
+      <p><strong>Data:</strong> ${req.date}</p>
+      <button class="btn-primary" onclick="openChat(${req.id})">Conversar com ONG</button>
+    </div>
+  `).join('');
+}
+
+// ===== PAINEL ADMINISTRATIVO ONG =====
+function switchAdminTab(tab) {
+  currentAdminTab = tab;
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`admin-${tab}`).classList.add('active');
+  event.target.classList.add('active');
+
+  if (tab === 'requests') {
+    renderAdminRequests();
+  } else if (tab === 'visits') {
+    renderAdminVisits();
+  } else if (tab === 'pets') {
+    renderAdminPets();
+  }
+}
+
+function updateAdminDashboard() {
+  document.getElementById('totalPets').textContent = database.pets.length;
+  document.getElementById('pendingRequests').textContent = database.adoptionRequests.filter(r => r.status === 'pending').length;
+  document.getElementById('approvedAdoptions').textContent = database.adoptionRequests.filter(r => r.status === 'approved').length;
+}
+
+function renderAdminPets() {
+  const list = document.getElementById('petsList');
+  list.innerHTML = database.pets.map(pet => `
+    <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin-bottom: 1rem; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <strong>${pet.name}</strong> - ${pet.breed}
+        <p style="font-size:0.9rem; color:#666;">${pet.city}, PR</p>
+      </div>
+      <button class="btn-secondary" onclick="alert('Editar pet: ${pet.name}')">Editar</button>
+    </div>
+  `).join('');
+}
+
+function renderAdminRequests() {
+  const list = document.getElementById('requestsListAdmin');
+  list.innerHTML = database.adoptionRequests.map(req => `
+    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
+      <h4>${req.petName}</h4>
+      <p><strong>Adotador:</strong> ${req.adopterName}</p>
+      <p><strong>Status:</strong> ${req.status}</p>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button class="btn-primary" onclick="approveRequest(${req.id})">Aprovar</button>
+        <button class="btn-secondary" onclick="rejectRequest(${req.id})">Rejeitar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function approveRequest(requestId) {
+  const req = database.adoptionRequests.find(r => r.id === requestId);
+  req.status = 'approved';
+  renderAdminRequests();
+  alert(`Solicitação de ${req.adopterName} aprovada!`);
+}
+
+function rejectRequest(requestId) {
+  const req = database.adoptionRequests.find(r => r.id === requestId);
+  req.status = 'rejected';
+  renderAdminRequests();
+  alert(`Solicitação de ${req.adopterName} rejeitada!`);
+}
+
+function renderAdminVisits() {
+  const list = document.getElementById('visitsList');
+  list.innerHTML = '<p style="text-align:center; color:#999;">Nenhuma visita agendada.</p>';
+}
+
+function openAddPetForm() {
+  alert('Formulário de adição de pet (em desenvolvimento)');
+}
