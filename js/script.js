@@ -255,6 +255,7 @@ async function logout() {
 function updateHeader() {
   const btnLogin = document.getElementById('btnLogin');
   const btnProfile = document.getElementById('btnProfile');
+  const btnNotifications = document.getElementById('btnNotifications');
   const ongAdminLink = document.getElementById('ongAdminLink');
 
   if (currentUser) {
@@ -264,24 +265,111 @@ function updateHeader() {
 
     if (currentUser.user_type === 'ong') {
       ongAdminLink.style.display = 'block';
+      btnNotifications.style.display = 'none';
     } else {
       ongAdminLink.style.display = 'none';
+      btnNotifications.style.display = 'block';
+      refreshNotificationBadge();
     }
   } else {
     btnLogin.style.display = 'block';
     btnProfile.style.display = 'none';
+    btnNotifications.style.display = 'none';
     ongAdminLink.style.display = 'none';
   }
 }
 
 function toggleProfileMenu() {
+  document.getElementById('notificationsMenu').style.display = 'none';
   const menu = document.getElementById('profileMenu');
   menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+// ============================================================================
+// NOTIFICAÇÕES (etapas do processo de adoção)
+// ============================================================================
+async function refreshNotificationBadge() {
+  if (!currentUser || currentUser.user_type !== 'adopter') return;
+
+  const { count } = await sb
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('adopter_id', currentUser.id)
+    .eq('is_read', false);
+
+  const badge = document.getElementById('notificationBadge');
+  if (count && count > 0) {
+    badge.textContent = count > 9 ? '9+' : String(count);
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+async function toggleNotificationsMenu() {
+  document.getElementById('profileMenu').style.display = 'none';
+  const menu = document.getElementById('notificationsMenu');
+  const opening = menu.style.display === 'none';
+  menu.style.display = opening ? 'block' : 'none';
+  if (opening) {
+    await renderNotifications();
+    await markAllNotificationsRead();
+  }
+}
+
+async function renderNotifications() {
+  const list = document.getElementById('notificationsList');
+  const { data: notifications, error } = await sb
+    .from('notifications')
+    .select('id, message, is_read, created_at')
+    .eq('adopter_id', currentUser.id)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    list.innerHTML = `<p style="color:#999;">Erro ao carregar notificações.</p>`;
+    return;
+  }
+
+  if (!notifications || notifications.length === 0) {
+    list.innerHTML = '<p style="color:#999;">Nenhuma notificação.</p>';
+    return;
+  }
+
+  list.innerHTML = notifications.map(n => `
+    <div style="padding:0.6rem 0; border-bottom:1px solid rgba(255,255,255,0.15); ${n.is_read ? 'opacity:0.6;' : ''}">
+      <p style="margin:0;">${n.message}</p>
+      <span style="font-size:0.75rem; color:#999;">${new Date(n.created_at).toLocaleString()}</span>
+    </div>
+  `).join('');
+}
+
+async function markAllNotificationsRead() {
+  await sb.from('notifications').update({ is_read: true }).eq('adopter_id', currentUser.id).eq('is_read', false);
+  refreshNotificationBadge();
+}
+
+async function createNotification(requestId, message) {
+  const { data: request } = await sb
+    .from('adoption_requests')
+    .select('adopter_id')
+    .eq('id', requestId)
+    .single();
+
+  if (!request) return;
+
+  const { error } = await sb.from('notifications').insert([{
+    adopter_id: request.adopter_id,
+    request_id: requestId,
+    message
+  }]);
+  if (error) console.error('Erro ao criar notificação:', error.message);
 }
 
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.btn-profile') && !e.target.closest('.profile-menu')) {
     document.getElementById('profileMenu').style.display = 'none';
+    document.getElementById('notificationsMenu').style.display = 'none';
   }
 });
 
@@ -500,12 +588,22 @@ function openPetDetail(petId) {
   content.innerHTML = `
     <h2>${pet.name}</h2>
     <img src="${pet.image_url || 'images/pet-dog-brown-1.png'}" alt="${pet.name}" style="width:100%; border-radius:12px; margin:1rem 0;">
+    ${pet.video_url ? `<video src="${pet.video_url}" controls style="width:100%; border-radius:12px; margin:0 0 1rem 0;"></video>` : ''}
     <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin: 1rem 0;">
       <p><strong>Raça:</strong> ${pet.breed}</p>
       <p><strong>Idade:</strong> ${pet.age} anos</p>
       <p><strong>Tamanho:</strong> ${pet.size}</p>
       <p><strong>Energia:</strong> ${pet.energy || 'Moderada'}</p>
       <p><strong>Localização:</strong> ${pet.city}, PR</p>
+    </div>
+    <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin: 1rem 0;">
+      <h3 style="margin-top:0;">Saúde</h3>
+      <p>${pet.vaccinated ? '✅' : '❌'} Vacinado &nbsp; ${pet.neutered ? '✅' : '❌'} Castrado &nbsp; ${pet.dewormed ? '✅' : '❌'} Vermifugado</p>
+      ${pet.health_notes ? `<p><strong>Observações:</strong> ${pet.health_notes}</p>` : ''}
+    </div>
+    <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin: 1rem 0;">
+      <h3 style="margin-top:0;">Comportamento</h3>
+      <p>${pet.temperament || 'Ainda não informado pela ONG.'}</p>
     </div>
     <div style="margin: 1rem 0;">
       <h3>Sobre ${pet.name}</h3>
@@ -717,11 +815,40 @@ async function renderMyRequests() {
   list.innerHTML = requests.map(req => `
     <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border-left: 4px solid var(--primary-blue);">
       <h3>${req.pets ? req.pets.name : 'Pet removido'}</h3>
-      <p><strong>Status:</strong> <span style="color: ${req.status === 'approved' ? 'green' : req.status === 'rejected' ? 'red' : 'orange'};">${req.status}</span></p>
       <p><strong>Data:</strong> ${new Date(req.created_at).toLocaleDateString()}</p>
-      <button class="btn-primary" onclick="showOngContact('${req.pets ? req.pets.ong_id : ''}')">Contato da ONG</button>
+      ${renderProgressBar(req.status)}
+      <button class="btn-primary" style="margin-top:1rem;" onclick="showOngContact('${req.pets ? req.pets.ong_id : ''}')">Contato da ONG</button>
     </div>
   `).join('');
+}
+
+function renderProgressBar(status) {
+  if (status === 'rejected') {
+    return `<p style="color:#d33; font-weight:bold; margin-top:0.5rem;">❌ Solicitação rejeitada</p>`;
+  }
+
+  const steps = [
+    { key: 'pending', label: 'Solicitado' },
+    { key: 'approved', label: 'Aprovado' },
+    { key: 'visit_scheduled', label: 'Visita agendada' },
+    { key: 'completed', label: 'Adotado' }
+  ];
+  const order = ['pending', 'approved', 'visit_scheduled', 'completed'];
+  const currentIndex = order.indexOf(status);
+
+  return `
+    <div style="display:flex; align-items:center; margin-top:1rem;">
+      ${steps.map((step, i) => `
+        <div style="flex:1; text-align:center;">
+          <div style="width:28px; height:28px; border-radius:50%; margin:0 auto; display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:bold; color:#fff; background:${i <= currentIndex ? 'var(--primary-green)' : '#ccc'};">
+            ${i < currentIndex ? '✓' : i + 1}
+          </div>
+          <div style="font-size:0.7rem; margin-top:0.25rem; color:${i <= currentIndex ? 'var(--dark-text)' : '#999'};">${step.label}</div>
+        </div>
+        ${i < steps.length - 1 ? `<div style="flex:1; height:3px; background:${i < currentIndex ? 'var(--primary-green)' : '#ccc'}; margin-bottom:1.2rem;"></div>` : ''}
+      `).join('')}
+    </div>
+  `;
 }
 
 async function showOngContact(ongId) {
@@ -846,6 +973,12 @@ function openAddPetForm() {
   document.getElementById('petFormEnergy').value = 'Moderada';
   document.getElementById('petFormCity').value = currentUser?.city || '';
   document.getElementById('petFormImage').value = '';
+  document.getElementById('petFormVideo').value = '';
+  document.getElementById('petFormVaccinated').checked = false;
+  document.getElementById('petFormNeutered').checked = false;
+  document.getElementById('petFormDewormed').checked = false;
+  document.getElementById('petFormHealthNotes').value = '';
+  document.getElementById('petFormTemperament').value = '';
   document.getElementById('petFormModal').classList.add('active');
 }
 
@@ -865,6 +998,12 @@ async function openEditPetForm(petId) {
   document.getElementById('petFormEnergy').value = pet.energy || 'Moderada';
   document.getElementById('petFormCity').value = pet.city;
   document.getElementById('petFormImage').value = '';
+  document.getElementById('petFormVideo').value = '';
+  document.getElementById('petFormVaccinated').checked = !!pet.vaccinated;
+  document.getElementById('petFormNeutered').checked = !!pet.neutered;
+  document.getElementById('petFormDewormed').checked = !!pet.dewormed;
+  document.getElementById('petFormHealthNotes').value = pet.health_notes || '';
+  document.getElementById('petFormTemperament').value = pet.temperament || '';
   document.getElementById('petFormModal').classList.add('active');
 }
 
@@ -884,19 +1023,38 @@ async function savePetForm(e) {
   const energy = document.getElementById('petFormEnergy').value;
   const city = document.getElementById('petFormCity').value.trim();
   const imageFile = document.getElementById('petFormImage').files[0];
+  const videoFile = document.getElementById('petFormVideo').files[0];
+  const vaccinated = document.getElementById('petFormVaccinated').checked;
+  const neutered = document.getElementById('petFormNeutered').checked;
+  const dewormed = document.getElementById('petFormDewormed').checked;
+  const healthNotes = document.getElementById('petFormHealthNotes').value.trim();
+  const temperament = document.getElementById('petFormTemperament').value.trim();
 
   if (!name || !breed || !city || isNaN(age) || age < 0) {
     alert('Preencha nome, raça, cidade e uma idade válida.');
     return;
   }
 
-  const petData = { name, type, breed, age, size, energy, city, ong_id: currentUser.id };
+  const petData = {
+    name, type, breed, age, size, energy, city, ong_id: currentUser.id,
+    vaccinated, neutered, dewormed,
+    health_notes: healthNotes, temperament
+  };
 
   if (imageFile) {
     try {
       petData.image_url = await uploadFileToBucket('pet-images', imageFile, `pets/${currentUser.id}`);
     } catch (uploadError) {
       alert('Erro ao enviar imagem: ' + uploadError.message);
+      return;
+    }
+  }
+
+  if (videoFile) {
+    try {
+      petData.video_url = await uploadFileToBucket('pet-images', videoFile, `pet-videos/${currentUser.id}`);
+    } catch (uploadError) {
+      alert('Erro ao enviar vídeo: ' + uploadError.message);
       return;
     }
   }
@@ -967,6 +1125,8 @@ async function renderAdminRequests() {
           <button class="btn-secondary" onclick="rejectRequest('${req.id}')">Rejeitar</button>
         ` : req.status === 'approved' ? `
           <button class="btn-primary" onclick="scheduleVisit('${req.id}')">Agendar Visita</button>
+        ` : req.status === 'visit_scheduled' ? `
+          <button class="btn-primary" onclick="completeAdoption('${req.id}')">Concluir Adoção</button>
         ` : ''}
       </div>
     </div>
@@ -976,6 +1136,7 @@ async function renderAdminRequests() {
 async function approveRequest(requestId) {
   const { error } = await sb.from('adoption_requests').update({ status: 'approved' }).eq('id', requestId);
   if (error) { alert('Erro ao aprovar: ' + error.message); return; }
+  await createNotification(requestId, 'Sua solicitação de adoção foi aprovada! A ONG vai agendar uma visita em breve.');
   renderAdminRequests();
   updateAdminDashboard();
   alert('Solicitação aprovada!');
@@ -984,6 +1145,7 @@ async function approveRequest(requestId) {
 async function rejectRequest(requestId) {
   const { error } = await sb.from('adoption_requests').update({ status: 'rejected' }).eq('id', requestId);
   if (error) { alert('Erro ao rejeitar: ' + error.message); return; }
+  await createNotification(requestId, 'Sua solicitação de adoção não foi aprovada desta vez.');
   renderAdminRequests();
   updateAdminDashboard();
   alert('Solicitação rejeitada!');
@@ -1009,8 +1171,38 @@ async function scheduleVisit(requestId) {
     return;
   }
 
+  await sb.from('adoption_requests').update({ status: 'visit_scheduled' }).eq('id', requestId);
+  await createNotification(requestId, `Uma visita foi agendada para ${scheduledDate.toLocaleString()}.`);
+
   alert('Visita agendada com sucesso!');
+  renderAdminRequests();
   updateAdminDashboard();
+}
+
+async function completeAdoption(requestId) {
+  if (!confirm('Confirmar que a adoção foi concluída?')) return;
+
+  const { data: request, error: fetchError } = await sb
+    .from('adoption_requests')
+    .select('pet_id')
+    .eq('id', requestId)
+    .single();
+
+  if (fetchError || !request) {
+    alert('Não foi possível localizar essa solicitação.');
+    return;
+  }
+
+  const { error: reqError } = await sb.from('adoption_requests').update({ status: 'completed' }).eq('id', requestId);
+  if (reqError) { alert('Erro ao concluir: ' + reqError.message); return; }
+
+  await sb.from('pets').update({ status: 'adopted' }).eq('id', request.pet_id);
+  await createNotification(requestId, 'Parabéns! Sua adoção foi concluída. 🎉');
+
+  renderAdminRequests();
+  renderAdminPets();
+  updateAdminDashboard();
+  alert('Adoção concluída com sucesso!');
 }
 
 async function renderAdminVisits() {
