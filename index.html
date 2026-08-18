@@ -70,15 +70,37 @@
           <h2>Histórias de Sucesso</h2>
           <div class="carousel">
             <div class="carousel-item active">
-              <img src="images/petmatch-carousel-success-1.png" alt="História 1">
+              <img src="images/petmatch-carousel-success-1.png" alt="História de Rex">
+              <div class="carousel-text">
+                <h3>Rex encontrou sua família</h3>
+                <p>Depois de 8 meses no abrigo, o Rex foi adotado pela família Oliveira. Hoje ele passa os dias no quintal brincando com as crianças e já é considerado parte da família.</p>
+              </div>
             </div>
             <div class="carousel-item">
-              <img src="images/petmatch-carousel-success-2.png" alt="História 2">
+              <img src="images/petmatch-carousel-success-2.png" alt="História de Mia">
+              <div class="carousel-text">
+                <h3>Mia ganhou uma segunda chance</h3>
+                <p>Resgatada da rua ainda filhote, a Mia foi adotada através do PetMatch e hoje vive tranquila em um apartamento cheio de carinho, sol na janela e ração na hora certa.</p>
+              </div>
+            </div>
+            <div class="carousel-item">
+              <img src="images/petmatch-carousel-success-3.png" alt="História de Thor">
+              <div class="carousel-text">
+                <h3>Thor, o idoso que ninguém queria</h3>
+                <p>Com 9 anos, o Thor ficou meses esperando um lar. Foi adotado por um casal que buscava justamente um cão mais calmo — hoje eles não se separam.</p>
+              </div>
+            </div>
+            <div class="carousel-item">
+              <img src="images/petmatch-hero-banner.png" alt="História de Luna">
+              <div class="carousel-text">
+                <h3>Luna trouxe alegria para casa</h3>
+                <p>A adoção da Luna foi feita em poucos dias pelo PetMatch. A família conta que ela se adaptou rápido e virou a melhor amiga da caçula da casa.</p>
+              </div>
             </div>
           </div>
           <div class="carousel-controls">
             <button onclick="prevCarousel()">❮</button>
-            <span id="carouselIndicator">1 / 2</span>
+            <span id="carouselIndicator">1 / 4</span>
             <button onclick="nextCarousel()">❯</button>
           </div>
         </section>
@@ -151,10 +173,6 @@
             <div class="filter-group">
               <label>Localização</label>
               <input type="text" id="filterLocation" placeholder="Cidade..." onkeyup="filterPets()">
-            </div>
-            <div class="filter-group">
-              <label>Buscar</label>
-              <input type="text" id="filterSearch" placeholder="Nome ou raça..." onkeyup="filterPets()">
             </div>
             <div class="filter-group">
               <label>
@@ -546,6 +564,21 @@
         <button type="submit" class="btn-primary" style="width:100%;">Salvar Pet</button>
       </form>
     </div>
+  </div>
+
+  <!-- SUPPORT CHATBOT -->
+  <button id="supportChatToggle" class="support-chat-toggle" onclick="toggleSupportChat()">💬</button>
+  <div id="supportChatWindow" class="support-chat-window">
+    <div class="support-chat-header">
+      <span>🐾 Suporte PetMatch</span>
+      <button onclick="toggleSupportChat()" aria-label="Fechar">&times;</button>
+    </div>
+    <div id="supportChatMessages" class="support-chat-messages"></div>
+    <div id="supportChatSuggestions" class="support-chat-suggestions"></div>
+    <form id="supportChatForm" class="support-chat-input" onsubmit="handleSupportChatSubmit(event)">
+      <input type="text" id="supportChatInput" placeholder="Digite sua dúvida..." autocomplete="off">
+      <button type="submit">Enviar</button>
+    </form>
   </div>
 
   <!-- Supabase JS SDK (precisa vir ANTES de js/script.js, que usa o objeto global "supabase") -->
