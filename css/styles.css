@@ -717,6 +717,23 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 600px;
 }
 
+#authModal .modal-content {
+  max-width: 640px;
+}
+
+.modal-content.how-it-works-modal {
+  max-width: 900px;
+  text-align: center;
+}
+
+.modal-content.how-it-works-modal h2 {
+  color: var(--primary-blue);
+}
+
+.modal-content.how-it-works-modal .how-it-works-columns {
+  margin-top: 2rem;
+}
+
 .modal-close {
   position: absolute;
   right: 1rem;
@@ -743,7 +760,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .user-type-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1.5rem;
 }
 
@@ -753,6 +770,9 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s;
+  background: none;
+  font-family: 'Poppins', sans-serif;
+  width: 100%;
 }
 
 .user-type-card:hover {
@@ -764,6 +784,27 @@ h1, h2, h3, h4, h5, h6 {
 .user-type-card.ong-card:hover {
   border-color: var(--primary-green);
   box-shadow: 0 4px 12px rgba(43, 184, 74, 0.1);
+}
+
+.user-type-card.how-it-works-card {
+  border-style: dashed;
+  border-color: var(--primary-blue);
+  background: var(--light-bg);
+}
+
+.user-type-card.how-it-works-card:hover {
+  border-style: solid;
+}
+
+.auth-ai-hint {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+  color: #777;
+  text-align: center;
+}
+
+.auth-ai-hint strong {
+  color: var(--primary-blue);
 }
 
 .card-icon {
