@@ -183,11 +183,11 @@
           </div>
           <div class="stat">
             <h3 class="counter" id="statAdopted" data-target="0">0</h3>
-            <p>Adotados <span id="statAdoptedPct" style="font-size: 0.6em; color: #2BA84A;"></span></p>
+            <p>Adotados</p>
           </div>
           <div class="stat">
             <h3 class="counter" id="statAvailable" data-target="0">0</h3>
-            <p>Disponíveis <span id="statAvailablePct" style="font-size: 0.6em; color: #0066CC;"></span></p>
+            <p>Disponíveis</p>
           </div>
         </section>
 
@@ -466,12 +466,18 @@
             <h3>Adotador</h3>
             <p>Procurando seu companheiro perfeito</p>
           </div>
+          <button type="button" class="user-type-card how-it-works-card" onclick="openHowItWorksModal()">
+            <div class="card-icon">❓</div>
+            <h3>Como Funciona</h3>
+            <p>Veja o passo a passo do site</p>
+          </button>
           <div class="user-type-card ong-card" onclick="selectUserType('ong')">
             <div class="card-icon">🏢</div>
             <h3>ONG</h3>
             <p>Gerenciando adoções responsáveis</p>
           </div>
         </div>
+        <p class="auth-ai-hint">Ainda com dúvidas? Você pode perguntar para a <strong>IA de suporte do PetMatch</strong> (ícone 💬 no canto da tela).</p>
       </div>
 
       <!-- Auth Tabs -->
@@ -545,6 +551,80 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- How It Works Modal -->
+  <div id="howItWorksModal" class="modal">
+    <div class="modal-content how-it-works-modal">
+      <span class="modal-close" onclick="closeHowItWorksModal()">&times;</span>
+      <h2>Como Funciona</h2>
+      <p class="how-it-works-subtitle">Simples, transparente e feito para conectar você ao pet certo.</p>
+      <div class="how-it-works-columns">
+        <div class="how-it-works-column">
+          <h3>🧑 Para Adotadores</h3>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">1</div>
+            <div>
+              <strong>Explore os pets</strong>
+              <p>Filtre por tipo, tamanho e localização até encontrar o companheiro ideal.</p>
+            </div>
+          </div>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">2</div>
+            <div>
+              <strong>Veja os detalhes</strong>
+              <p>Confira fotos, vídeo, saúde e comportamento de cada animal.</p>
+            </div>
+          </div>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">3</div>
+            <div>
+              <strong>Solicite a adoção</strong>
+              <p>Envie sua solicitação com um clique e acompanhe pela barra de progresso.</p>
+            </div>
+          </div>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">4</div>
+            <div>
+              <strong>Visita e adoção</strong>
+              <p>A ONG agenda uma visita e, quando tudo estiver certo, conclui a adoção.</p>
+            </div>
+          </div>
+        </div>
+        <div class="how-it-works-column">
+          <h3>🏠 Para ONGs</h3>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">1</div>
+            <div>
+              <strong>Cadastre sua ONG</strong>
+              <p>Crie uma conta gratuita e tenha acesso ao painel administrativo.</p>
+            </div>
+          </div>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">2</div>
+            <div>
+              <strong>Cadastre os pets</strong>
+              <p>Adicione foto, vídeo, saúde e comportamento de cada animal disponível.</p>
+            </div>
+          </div>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">3</div>
+            <div>
+              <strong>Gerencie solicitações</strong>
+              <p>Aprove ou rejeite pedidos de adoção recebidos pela plataforma.</p>
+            </div>
+          </div>
+          <div class="how-it-works-step">
+            <div class="how-it-works-number">4</div>
+            <div>
+              <strong>Agende e conclua</strong>
+              <p>Marque a visita e finalize a adoção quando tudo estiver certo.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="auth-ai-hint">Ainda com dúvidas? Pergunte para a <strong>IA de suporte do PetMatch</strong> (ícone 💬 no canto da tela).</p>
     </div>
   </div>
 
