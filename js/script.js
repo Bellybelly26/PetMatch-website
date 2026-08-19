@@ -58,16 +58,10 @@ async function loadStats() {
   const adopted = FEATURED_SUCCESS_STORIES + (adoptedCount || 0);
   const available = availableCount || 0;
   const families = FEATURED_SUCCESS_STORIES + (familiesCount || 0);
-  const totalPets = adopted + available;
 
   document.getElementById('statFamilies').dataset.target = families;
   document.getElementById('statAdopted').dataset.target = adopted;
   document.getElementById('statAvailable').dataset.target = available;
-
-  if (totalPets > 0) {
-    document.getElementById('statAdoptedPct').textContent = `${Math.round((adopted / totalPets) * 100)}%`;
-    document.getElementById('statAvailablePct').textContent = `${Math.round((available / totalPets) * 100)}%`;
-  }
 
   animateCounters();
 }
@@ -141,6 +135,14 @@ function switchAuthTab(tab) {
 function backToUserType() {
   document.getElementById('userTypeSelection').style.display = 'block';
   document.getElementById('authTabs').style.display = 'none';
+}
+
+function openHowItWorksModal() {
+  document.getElementById('howItWorksModal').classList.add('active');
+}
+
+function closeHowItWorksModal() {
+  document.getElementById('howItWorksModal').classList.remove('active');
 }
 
 // ----- Validação simples de formulários -----
