@@ -29,11 +29,48 @@ let editingPetId = null;    // usado pelo formulário de adicionar/editar pet
 document.addEventListener('DOMContentLoaded', () => {
   restoreSession();
   showPage('home');
-  animateCounters();
-  startCarouselAutoPlay();
+  loadStats();
   startTestimonialAutoPlay();
   renderPets();
 });
+
+async function loadStats() {
+  // As 4 "Histórias de Sucesso" em destaque na home já representam adoções e
+  // famílias felizes reais — por isso somamos como ponto de partida em ambos
+  // os números, e a partir daí eles crescem de verdade junto com o sistema.
+  const FEATURED_SUCCESS_STORIES = 4;
+
+  const { count: adoptedCount } = await sb
+    .from('pets')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'adopted');
+
+  const { count: availableCount } = await sb
+    .from('pets')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'available');
+
+  const { count: familiesCount } = await sb
+    .from('adoption_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'completed');
+
+  const adopted = FEATURED_SUCCESS_STORIES + (adoptedCount || 0);
+  const available = availableCount || 0;
+  const families = FEATURED_SUCCESS_STORIES + (familiesCount || 0);
+  const totalPets = adopted + available;
+
+  document.getElementById('statFamilies').dataset.target = families;
+  document.getElementById('statAdopted').dataset.target = adopted;
+  document.getElementById('statAvailable').dataset.target = available;
+
+  if (totalPets > 0) {
+    document.getElementById('statAdoptedPct').textContent = `${Math.round((adopted / totalPets) * 100)}%`;
+    document.getElementById('statAvailablePct').textContent = `${Math.round((available / totalPets) * 100)}%`;
+  }
+
+  animateCounters();
+}
 
 // ============================================================================
 // AUTENTICAÇÃO (Supabase Auth + tabela profiles)
@@ -418,12 +455,6 @@ function updateCarousel() {
     item.classList.toggle('active', i === currentCarouselIndex);
   });
   document.getElementById('carouselIndicator').textContent = `${currentCarouselIndex + 1} / ${items.length}`;
-}
-
-function startCarouselAutoPlay() {
-  setInterval(() => {
-    nextCarousel();
-  }, 6000);
 }
 
 // ===== TESTIMONIALS =====
