@@ -477,7 +477,7 @@ async function renderPets() {
 
   const { data: pets, error } = await sb
     .from('pets')
-    .select('*, profiles(name)')
+    .select('*')
     .eq('status', 'available')
     .order('created_at', { ascending: false });
 
@@ -487,6 +487,14 @@ async function renderPets() {
   }
 
   allPets = pets || [];
+
+  // Busca o nome das ONGs separadamente (evita ambiguidade de relação no Supabase)
+  const ongIds = [...new Set(allPets.map(p => p.ong_id).filter(Boolean))];
+  if (ongIds.length > 0) {
+    const { data: ongs } = await sb.from('profiles').select('id, name').in('id', ongIds);
+    const ongNameById = Object.fromEntries((ongs || []).map(o => [o.id, o.name]));
+    allPets = allPets.map(pet => ({ ...pet, ongName: ongNameById[pet.ong_id] || 'ONG não identificada' }));
+  }
 
   if (currentUser && currentUser.user_type === 'adopter') {
     const { data: favs } = await sb
@@ -533,7 +541,7 @@ function applyPetFilters() {
         <div class="pet-details">${pet.breed}</div>
         <div class="pet-details">${pet.age} anos • ${pet.size}</div>
         <div class="pet-details">📍 ${pet.city}</div>
-        <div class="pet-details">🏠 ${pet.profiles?.name || 'ONG não identificada'}</div>
+        <div class="pet-details">🏠 ${pet.ongName || 'ONG não identificada'}</div>
         <div class="pet-actions">
           <button class="btn-favorite ${isFavorite ? 'active' : ''}" onclick="toggleFavorite('${pet.id}')">
             ${isFavorite ? '❤️' : '🤍'}
@@ -597,7 +605,7 @@ function openPetDetail(petId) {
       <p><strong>Tamanho:</strong> ${pet.size}</p>
       <p><strong>Energia:</strong> ${pet.energy || 'Moderada'}</p>
       <p><strong>Localização:</strong> ${pet.city}, PR</p>
-      <p><strong>ONG responsável:</strong> ${pet.profiles?.name || 'Não identificada'}</p>
+      <p><strong>ONG responsável:</strong> ${pet.ongName || 'Não identificada'}</p>
     </div>
     <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin: 1rem 0;">
       <h3 style="margin-top:0;">Saúde</h3>
