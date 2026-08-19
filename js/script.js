@@ -401,20 +401,23 @@ function showPage(page) {
 
 // ===== CAROUSEL =====
 function nextCarousel() {
-  currentCarouselIndex = (currentCarouselIndex + 1) % 2;
+  const total = document.querySelectorAll('.carousel-item').length;
+  currentCarouselIndex = (currentCarouselIndex + 1) % total;
   updateCarousel();
 }
 
 function prevCarousel() {
-  currentCarouselIndex = (currentCarouselIndex - 1 + 2) % 2;
+  const total = document.querySelectorAll('.carousel-item').length;
+  currentCarouselIndex = (currentCarouselIndex - 1 + total) % total;
   updateCarousel();
 }
 
 function updateCarousel() {
-  document.querySelectorAll('.carousel-item').forEach((item, i) => {
+  const items = document.querySelectorAll('.carousel-item');
+  items.forEach((item, i) => {
     item.classList.toggle('active', i === currentCarouselIndex);
   });
-  document.getElementById('carouselIndicator').textContent = `${currentCarouselIndex + 1} / 2`;
+  document.getElementById('carouselIndicator').textContent = `${currentCarouselIndex + 1} / ${items.length}`;
 }
 
 function startCarouselAutoPlay() {
@@ -474,7 +477,7 @@ async function renderPets() {
 
   const { data: pets, error } = await sb
     .from('pets')
-    .select('*')
+    .select('*, profiles(name)')
     .eq('status', 'available')
     .order('created_at', { ascending: false });
 
@@ -507,13 +510,11 @@ function applyPetFilters() {
   const typeFilter = document.getElementById('filterType')?.value;
   const sizeFilter = document.getElementById('filterSize')?.value;
   const locationFilter = document.getElementById('filterLocation')?.value.toLowerCase();
-  const searchFilter = document.getElementById('filterSearch')?.value.toLowerCase();
   const favoritesOnly = document.getElementById('filterFavorites')?.checked;
 
   if (typeFilter) pets = pets.filter(p => p.type === typeFilter);
   if (sizeFilter) pets = pets.filter(p => p.size === sizeFilter);
   if (locationFilter) pets = pets.filter(p => p.city.toLowerCase().includes(locationFilter));
-  if (searchFilter) pets = pets.filter(p => p.name.toLowerCase().includes(searchFilter) || p.breed.toLowerCase().includes(searchFilter));
   if (favoritesOnly) pets = pets.filter(p => myFavoritePetIds.includes(p.id));
 
   if (pets.length === 0) {
@@ -532,6 +533,7 @@ function applyPetFilters() {
         <div class="pet-details">${pet.breed}</div>
         <div class="pet-details">${pet.age} anos • ${pet.size}</div>
         <div class="pet-details">📍 ${pet.city}</div>
+        <div class="pet-details">🏠 ${pet.profiles?.name || 'ONG não identificada'}</div>
         <div class="pet-actions">
           <button class="btn-favorite ${isFavorite ? 'active' : ''}" onclick="toggleFavorite('${pet.id}')">
             ${isFavorite ? '❤️' : '🤍'}
@@ -595,6 +597,7 @@ function openPetDetail(petId) {
       <p><strong>Tamanho:</strong> ${pet.size}</p>
       <p><strong>Energia:</strong> ${pet.energy || 'Moderada'}</p>
       <p><strong>Localização:</strong> ${pet.city}, PR</p>
+      <p><strong>ONG responsável:</strong> ${pet.profiles?.name || 'Não identificada'}</p>
     </div>
     <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin: 1rem 0;">
       <h3 style="margin-top:0;">Saúde</h3>
@@ -1233,4 +1236,142 @@ async function renderAdminVisits() {
       ${v.notes ? `<p><strong>Notas:</strong> ${v.notes}</p>` : ''}
     </div>
   `).join('');
+}
+
+// ============================================================================
+// CHAT DE SUPORTE (perguntas frequentes, sem custo, sem API externa)
+// ============================================================================
+const SUPPORT_KNOWLEDGE_BASE = [
+  {
+    keywords: ['adotar', 'adoção', 'adocao', 'como funciona a adoção', 'processo de adoção'],
+    question: 'Como funciona o processo de adoção?',
+    answer: 'É simples: você encontra o pet na aba "Pets", clica em "Detalhes" e depois em "Quero Adotar!". A ONG responsável recebe sua solicitação, pode aprovar, agendar uma visita e, por fim, concluir a adoção. Você acompanha tudo pela barra de progresso em "Minhas Solicitações".'
+  },
+  {
+    keywords: ['cadastrar ong', 'sou uma ong', 'cadastro de ong', 'criar conta ong', 'abrigo'],
+    question: 'Como cadastrar minha ONG?',
+    answer: 'Clique em "Entrar" no topo da página, escolha a opção "ONG" e preencha o formulário de cadastro com nome, e-mail, telefone, endereço e cidade. Depois disso você já tem acesso ao Painel Administrativo.'
+  },
+  {
+    keywords: ['adicionar pet', 'cadastrar pet', 'colocar pet para adoção', 'novo pet'],
+    question: 'Como adicionar um pet para adoção?',
+    answer: 'Entre com sua conta de ONG, vá em "Painel ONG" → aba "Pets" → botão "Adicionar Pet". Preencha nome, tipo, raça, idade, tamanho, cidade, informações de saúde/comportamento e, se quiser, uma foto e um vídeo.'
+  },
+  {
+    keywords: ['favoritar', 'favorito', 'coração', 'salvar pet'],
+    question: 'Como favoritar um pet?',
+    answer: 'Na lista de pets, clique no coração 🤍 no card do animal. Ele fica salvo nos seus favoritos, e você pode filtrar só os favoritos marcando "Apenas Favoritos" nos filtros.'
+  },
+  {
+    keywords: ['notificação', 'notificacao', 'sino', 'aviso'],
+    question: 'Como funcionam as notificações?',
+    answer: 'O sininho 🔔 no topo da página avisa quando sua solicitação de adoção muda de status — por exemplo, quando é aprovada, quando uma visita é agendada ou quando a adoção é concluída.'
+  },
+  {
+    keywords: ['perfil', 'editar dados', 'meus dados', 'foto de perfil'],
+    question: 'Como edito meu perfil?',
+    answer: 'Clique no seu nome no topo da página → "Meu Perfil". Lá você pode atualizar telefone, endereço, cidade e enviar foto de perfil e fotos/vídeos da sua residência.'
+  },
+  {
+    keywords: ['senha', 'esqueci', 'recuperar acesso', 'não consigo entrar'],
+    question: 'Esqueci minha senha, e agora?',
+    answer: 'No momento o site ainda não tem recuperação automática de senha. Entre em contato diretamente com a equipe do PetMatch para receber ajuda com o acesso à sua conta.'
+  },
+  {
+    keywords: ['gratuito', 'grátis', 'custa', 'preço', 'pagar'],
+    question: 'O PetMatch é gratuito?',
+    answer: 'Sim! Usar o PetMatch para adotar ou para cadastrar pets como ONG é totalmente gratuito.'
+  },
+  {
+    keywords: ['visita', 'agendar visita', 'quando é a visita'],
+    question: 'Como funciona a visita?',
+    answer: 'Depois que sua solicitação é aprovada, a ONG agenda uma data para você conhecer o pet pessoalmente. Você recebe uma notificação assim que a visita for marcada.'
+  },
+  {
+    keywords: ['contato', 'falar com a ong', 'telefone da ong'],
+    question: 'Como falo com a ONG responsável pelo pet?',
+    answer: 'Em "Minhas Solicitações", clique no botão "Contato da ONG" dentro do card da sua solicitação — vai aparecer nome, e-mail, telefone e endereço da ONG.'
+  }
+];
+
+const SUPPORT_SUGGESTIONS = [
+  'Como funciona a adoção?',
+  'Como cadastrar minha ONG?',
+  'Como favoritar um pet?',
+  'O PetMatch é gratuito?'
+];
+
+let supportChatStarted = false;
+
+function toggleSupportChat() {
+  const win = document.getElementById('supportChatWindow');
+  const opening = !win.classList.contains('active');
+  win.classList.toggle('active', opening);
+
+  if (opening && !supportChatStarted) {
+    supportChatStarted = true;
+    addSupportMessage('bot', 'Oi! 👋 Eu sou o assistente virtual do PetMatch. Posso te ajudar com dúvidas sobre adoção, cadastro de pets, favoritos e mais. Pode perguntar!');
+    renderSupportSuggestions();
+  }
+
+  if (opening) {
+    document.getElementById('supportChatInput').focus();
+  }
+}
+
+function renderSupportSuggestions() {
+  const box = document.getElementById('supportChatSuggestions');
+  box.innerHTML = SUPPORT_SUGGESTIONS.map(s => `
+    <button type="button" onclick="askSupportSuggestion('${s.replace(/'/g, "\\'")}')">${s}</button>
+  `).join('');
+}
+
+function askSupportSuggestion(text) {
+  document.getElementById('supportChatInput').value = text;
+  handleSupportChatSubmit(new Event('submit'));
+}
+
+function handleSupportChatSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('supportChatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  addSupportMessage('user', text);
+  input.value = '';
+
+  setTimeout(() => {
+    const answer = findSupportAnswer(text);
+    addSupportMessage('bot', answer);
+  }, 400);
+}
+
+function findSupportAnswer(userText) {
+  const normalized = userText.toLowerCase();
+  let bestMatch = null;
+  let bestScore = 0;
+
+  SUPPORT_KNOWLEDGE_BASE.forEach(entry => {
+    let score = 0;
+    entry.keywords.forEach(keyword => {
+      if (normalized.includes(keyword)) score += keyword.length;
+    });
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = entry;
+    }
+  });
+
+  if (bestMatch) return bestMatch.answer;
+
+  return 'Não tenho certeza sobre isso ainda. 🐾 Você pode reformular a pergunta, ou, se preferir, falar direto com a ONG responsável pelo pet através da tela "Minhas Solicitações".';
+}
+
+function addSupportMessage(sender, text) {
+  const messages = document.getElementById('supportChatMessages');
+  const bubble = document.createElement('div');
+  bubble.className = `support-chat-bubble ${sender}`;
+  bubble.textContent = text;
+  messages.appendChild(bubble);
+  messages.scrollTop = messages.scrollHeight;
 }
