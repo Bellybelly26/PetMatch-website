@@ -1510,7 +1510,11 @@ async function adminDeleteUser(userId, userName) {
 // ============================================================================
 // VERIFICAÇÃO EM DUAS ETAPAS (demonstração acadêmica — sem envio real de SMS)
 // ============================================================================
-let pendingVerificationCode = null;
+// O código fica guardado no localStorage (não só na memória da página), para
+// não se perder caso a página recarregue entre o "enviar" e o "confirmar".
+function getTwoFactorStorageKey() {
+  return `petmatch_2fa_code_${currentUser.id}`;
+}
 
 function loadTwoFactorStatus() {
   const statusBox = document.getElementById('twoFactorStatus');
@@ -1521,8 +1525,12 @@ function loadTwoFactorStatus() {
     : `<p style="color:#d97706; font-weight:bold; margin:0;">⚠ Conta ainda não verificada</p>`;
 
   document.getElementById('twoFactorPhone').value = currentUser.phone || '';
-  document.getElementById('verificationCodeBox').style.display = 'none';
   document.getElementById('verificationCodeInput').value = '';
+
+  // Se já existe um código pendente salvo (ex.: a página foi recarregada
+  // depois de "Enviar"), mantém a caixa de confirmação visível.
+  const pending = localStorage.getItem(getTwoFactorStorageKey());
+  document.getElementById('verificationCodeBox').style.display = pending ? 'block' : 'none';
 }
 
 async function sendVerificationCode() {
@@ -1537,14 +1545,15 @@ async function sendVerificationCode() {
   await sb.from('profiles').update({ phone }).eq('id', currentUser.id);
   currentUser.phone = phone;
 
-  pendingVerificationCode = String(Math.floor(100000 + Math.random() * 900000));
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  localStorage.setItem(getTwoFactorStorageKey(), code);
 
   // DEMONSTRAÇÃO ACADÊMICA: sem um serviço de SMS pago (ex.: Twilio) configurado,
   // não há envio real. O código é exibido aqui para simular o recebimento.
   alert(
     `📧 Código enviado para o e-mail: ${currentUser.email}\n` +
     `📱 Código enviado por SMS para: ${phone}\n\n` +
-    `(Simulação para fins acadêmicos — código: ${pendingVerificationCode})`
+    `(Simulação para fins acadêmicos — código: ${code})`
   );
 
   document.getElementById('verificationCodeBox').style.display = 'block';
@@ -1552,13 +1561,14 @@ async function sendVerificationCode() {
 
 async function confirmVerificationCode() {
   const typed = document.getElementById('verificationCodeInput').value.trim();
+  const pending = localStorage.getItem(getTwoFactorStorageKey());
 
-  if (!pendingVerificationCode) {
-    alert('Clique em "Enviar Código de Verificação" primeiro.');
+  if (!pending) {
+    alert('Nenhum código pendente. Clique em "Enviar Código de Verificação" primeiro.');
     return;
   }
 
-  if (typed !== pendingVerificationCode) {
+  if (typed !== pending) {
     alert('Código incorreto. Tente novamente.');
     return;
   }
@@ -1570,7 +1580,7 @@ async function confirmVerificationCode() {
   }
 
   currentUser.two_factor_verified = true;
-  pendingVerificationCode = null;
+  localStorage.removeItem(getTwoFactorStorageKey());
   loadTwoFactorStatus();
   alert('Conta verificada com sucesso! ✔');
 }
