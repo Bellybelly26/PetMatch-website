@@ -1307,3 +1307,22 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Ajuste: "Como Funciona" agora vive dentro da página Sobre (.about-section) */
+.about-section.how-it-works-section {
+  max-width: none;
+  margin: 0;
+  text-align: left;
+}
+
+.about-section.how-it-works-section .how-it-works-subtitle {
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.about-section.how-it-works-section .how-it-works-column h4 {
+  color: var(--dark-text);
+  font-size: 1.15rem;
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
