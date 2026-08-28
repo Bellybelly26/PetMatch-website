@@ -26,8 +26,10 @@ Plataforma web para adoção de animais de estimação, conectando adotadores co
 
 ### Geral
 - ✅ Design responsivo (mobile, tablet, desktop)
-- ✅ Carrossel de histórias de sucesso
-- ✅ Depoimentos rotativos e contadores animados
+- ✅ Seção "Como Funciona", com o passo a passo para adotadores e para ONGs
+- ✅ Carrossel de histórias de sucesso (navegação manual, sem troca automática)
+- ✅ Estatísticas da home com dados reais do banco (pets adotados, disponíveis e famílias felizes)
+- ✅ Depoimentos rotativos
 - ✅ Segurança via Row Level Security (RLS) no banco de dados
 
 ## 🧱 Arquitetura e Tecnologias

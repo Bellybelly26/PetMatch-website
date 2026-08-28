@@ -44,7 +44,9 @@
     <div id="profileMenu" class="profile-menu" style="display:none;">
       <a href="#" onclick="showPage('adopter-profile')">Meu Perfil</a>
       <a href="#" onclick="showPage('my-requests')">Minhas Solicitações</a>
+      <a href="#" onclick="showPage('two-factor')">🔒 Verificação em Duas Etapas</a>
       <a href="#" id="ongAdminLink" onclick="showPage('ong-admin')" style="display:none;">Painel ONG</a>
+      <a href="#" id="adminPanelLink" onclick="showPage('admin-panel')" style="display:none;">Painel ADM</a>
       <hr style="margin: 0.5rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.2);">
       <a href="#" onclick="logout()" style="color: #FF6B9D; font-weight: bold;">🚪 Sair da Conta</a>
     </div>
@@ -62,6 +64,76 @@
           </div>
           <div class="hero-image">
             <img src="images/petmatch-hero-banner.png" alt="Família com pets">
+          </div>
+        </section>
+
+        <!-- COMO FUNCIONA -->
+        <section class="how-it-works-section">
+          <h2>Como Funciona</h2>
+          <p class="how-it-works-subtitle">Simples, transparente e feito para conectar você ao pet certo.</p>
+          <div class="how-it-works-columns">
+            <div class="how-it-works-column">
+              <h3>🧑 Para Adotadores</h3>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">1</div>
+                <div>
+                  <strong>Explore os pets</strong>
+                  <p>Filtre por tipo, tamanho e localização até encontrar o companheiro ideal.</p>
+                </div>
+              </div>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">2</div>
+                <div>
+                  <strong>Veja os detalhes</strong>
+                  <p>Confira fotos, vídeo, saúde e comportamento de cada animal.</p>
+                </div>
+              </div>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">3</div>
+                <div>
+                  <strong>Solicite a adoção</strong>
+                  <p>Envie sua solicitação com um clique e acompanhe pela barra de progresso.</p>
+                </div>
+              </div>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">4</div>
+                <div>
+                  <strong>Visita e adoção</strong>
+                  <p>A ONG agenda uma visita e, quando tudo estiver certo, conclui a adoção.</p>
+                </div>
+              </div>
+            </div>
+            <div class="how-it-works-column">
+              <h3>🏠 Para ONGs</h3>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">1</div>
+                <div>
+                  <strong>Cadastre sua ONG</strong>
+                  <p>Crie uma conta gratuita e tenha acesso ao painel administrativo.</p>
+                </div>
+              </div>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">2</div>
+                <div>
+                  <strong>Cadastre os pets</strong>
+                  <p>Adicione foto, vídeo, saúde e comportamento de cada animal disponível.</p>
+                </div>
+              </div>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">3</div>
+                <div>
+                  <strong>Gerencie solicitações</strong>
+                  <p>Aprove ou rejeite pedidos de adoção recebidos pela plataforma.</p>
+                </div>
+              </div>
+              <div class="how-it-works-step">
+                <div class="how-it-works-number">4</div>
+                <div>
+                  <strong>Agende e conclua</strong>
+                  <p>Marque a visita e finalize a adoção quando tudo estiver certo.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -344,6 +416,43 @@
           </div>
         </div>
       </div>
+
+      <!-- ADMIN (ADM) PANEL PAGE -->
+      <div id="page-admin-panel" class="page">
+        <div class="admin-container">
+          <h2>Painel Administrativo - ADM</h2>
+          <p style="color:#777; margin-bottom:1.5rem;">Gerencie todas as contas de adotadores e ONGs cadastradas na plataforma.</p>
+          <div id="adminUsersList"></div>
+        </div>
+      </div>
+
+      <!-- TWO-FACTOR VERIFICATION PAGE -->
+      <div id="page-two-factor" class="page">
+        <div class="admin-container" style="max-width: 560px;">
+          <h2>🔒 Verificação em Duas Etapas</h2>
+          <p style="color:#777; margin-bottom:1.5rem;">
+            Confirme que você tem acesso ao seu e-mail e telefone para deixar sua conta mais segura.
+            <br><small><em>(Versão de demonstração acadêmica: o código não é enviado de verdade por SMS/e-mail, apenas exibido na tela.)</em></small>
+          </p>
+
+          <div id="twoFactorStatus" style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;"></div>
+
+          <div class="form-group">
+            <label>Telefone</label>
+            <input type="tel" id="twoFactorPhone" placeholder="(00) 00000-0000">
+          </div>
+
+          <button class="btn-primary" style="width:100%; margin-bottom:1rem;" onclick="sendVerificationCode()">Enviar Código de Verificação</button>
+
+          <div id="verificationCodeBox" style="display:none;">
+            <div class="form-group">
+              <label>Digite o código recebido</label>
+              <input type="text" id="verificationCodeInput" maxlength="6" placeholder="000000">
+            </div>
+            <button class="btn-primary" style="width:100%;" onclick="confirmVerificationCode()">Confirmar Código</button>
+          </div>
+        </div>
+      </div>
     </main>
 
     <!-- FOOTER -->
@@ -396,18 +505,12 @@
             <h3>Adotador</h3>
             <p>Procurando seu companheiro perfeito</p>
           </div>
-          <button type="button" class="user-type-card how-it-works-card" onclick="openHowItWorksModal()">
-            <div class="card-icon">❓</div>
-            <h3>Como Funciona</h3>
-            <p>Veja o passo a passo do site</p>
-          </button>
           <div class="user-type-card ong-card" onclick="selectUserType('ong')">
             <div class="card-icon">🏢</div>
             <h3>ONG</h3>
             <p>Gerenciando adoções responsáveis</p>
           </div>
         </div>
-        <p class="auth-ai-hint">Ainda com dúvidas? Você pode perguntar para a <strong>IA de suporte do PetMatch</strong> (ícone 💬 no canto da tela).</p>
       </div>
 
       <!-- Auth Tabs -->
@@ -481,80 +584,6 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- How It Works Modal -->
-  <div id="howItWorksModal" class="modal">
-    <div class="modal-content how-it-works-modal">
-      <span class="modal-close" onclick="closeHowItWorksModal()">&times;</span>
-      <h2>Como Funciona</h2>
-      <p class="how-it-works-subtitle">Simples, transparente e feito para conectar você ao pet certo.</p>
-      <div class="how-it-works-columns">
-        <div class="how-it-works-column">
-          <h3>🧑 Para Adotadores</h3>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">1</div>
-            <div>
-              <strong>Explore os pets</strong>
-              <p>Filtre por tipo, tamanho e localização até encontrar o companheiro ideal.</p>
-            </div>
-          </div>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">2</div>
-            <div>
-              <strong>Veja os detalhes</strong>
-              <p>Confira fotos, vídeo, saúde e comportamento de cada animal.</p>
-            </div>
-          </div>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">3</div>
-            <div>
-              <strong>Solicite a adoção</strong>
-              <p>Envie sua solicitação com um clique e acompanhe pela barra de progresso.</p>
-            </div>
-          </div>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">4</div>
-            <div>
-              <strong>Visita e adoção</strong>
-              <p>A ONG agenda uma visita e, quando tudo estiver certo, conclui a adoção.</p>
-            </div>
-          </div>
-        </div>
-        <div class="how-it-works-column">
-          <h3>🏠 Para ONGs</h3>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">1</div>
-            <div>
-              <strong>Cadastre sua ONG</strong>
-              <p>Crie uma conta gratuita e tenha acesso ao painel administrativo.</p>
-            </div>
-          </div>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">2</div>
-            <div>
-              <strong>Cadastre os pets</strong>
-              <p>Adicione foto, vídeo, saúde e comportamento de cada animal disponível.</p>
-            </div>
-          </div>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">3</div>
-            <div>
-              <strong>Gerencie solicitações</strong>
-              <p>Aprove ou rejeite pedidos de adoção recebidos pela plataforma.</p>
-            </div>
-          </div>
-          <div class="how-it-works-step">
-            <div class="how-it-works-number">4</div>
-            <div>
-              <strong>Agende e conclua</strong>
-              <p>Marque a visita e finalize a adoção quando tudo estiver certo.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <p class="auth-ai-hint">Ainda com dúvidas? Pergunte para a <strong>IA de suporte do PetMatch</strong> (ícone 💬 no canto da tela).</p>
     </div>
   </div>
 
