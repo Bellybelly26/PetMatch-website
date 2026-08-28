@@ -81,6 +81,11 @@ async function restoreSession() {
     .single();
 
   if (profile) {
+    if (profile.is_blocked) {
+      await sb.auth.signOut();
+      alert('Sua conta foi bloqueada pela administração da plataforma.');
+      return;
+    }
     currentUser = profile;
     updateHeader();
   }
@@ -137,14 +142,6 @@ function backToUserType() {
   document.getElementById('authTabs').style.display = 'none';
 }
 
-function openHowItWorksModal() {
-  document.getElementById('howItWorksModal').classList.add('active');
-}
-
-function closeHowItWorksModal() {
-  document.getElementById('howItWorksModal').classList.remove('active');
-}
-
 // ----- Validação simples de formulários -----
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -185,6 +182,12 @@ async function handleLogin() {
 
   if (profileError || !profile) {
     alert('Erro ao carregar seu perfil. Tente novamente.');
+    return;
+  }
+
+  if (profile.is_blocked) {
+    await sb.auth.signOut();
+    alert('Sua conta foi bloqueada pela administração da plataforma. Entre em contato com o suporte para mais informações.');
     return;
   }
 
@@ -296,14 +299,20 @@ function updateHeader() {
   const btnProfile = document.getElementById('btnProfile');
   const btnNotifications = document.getElementById('btnNotifications');
   const ongAdminLink = document.getElementById('ongAdminLink');
+  const adminPanelLink = document.getElementById('adminPanelLink');
 
   if (currentUser) {
     btnLogin.style.display = 'none';
     btnProfile.style.display = 'block';
     document.getElementById('userName').textContent = currentUser.name;
 
+    adminPanelLink.style.display = currentUser.user_type === 'admin' ? 'block' : 'none';
+
     if (currentUser.user_type === 'ong') {
       ongAdminLink.style.display = 'block';
+      btnNotifications.style.display = 'none';
+    } else if (currentUser.user_type === 'admin') {
+      ongAdminLink.style.display = 'none';
       btnNotifications.style.display = 'none';
     } else {
       ongAdminLink.style.display = 'none';
@@ -315,6 +324,7 @@ function updateHeader() {
     btnProfile.style.display = 'none';
     btnNotifications.style.display = 'none';
     ongAdminLink.style.display = 'none';
+    adminPanelLink.style.display = 'none';
   }
 }
 
@@ -433,6 +443,20 @@ function showPage(page) {
       return;
     }
     switchAdminTab('dashboard');
+  } else if (page === 'admin-panel') {
+    if (!currentUser || currentUser.user_type !== 'admin') {
+      alert('Apenas administradores têm acesso a esse painel.');
+      showPage('home');
+      return;
+    }
+    renderAdminUsersList();
+  } else if (page === 'two-factor') {
+    if (!currentUser) {
+      alert('Faça login para acessar a verificação em duas etapas.');
+      showPage('home');
+      return;
+    }
+    loadTwoFactorStatus();
   }
 
   window.scrollTo(0, 0);
@@ -1415,4 +1439,138 @@ function addSupportMessage(sender, text) {
   bubble.textContent = text;
   messages.appendChild(bubble);
   messages.scrollTop = messages.scrollHeight;
+}
+
+// ============================================================================
+// PAINEL ADM (verificar, bloquear e excluir usuários)
+// ============================================================================
+async function renderAdminUsersList() {
+  const container = document.getElementById('adminUsersList');
+  container.innerHTML = '<p style="text-align:center; color:#999;">Carregando usuários...</p>';
+
+  const { data: users, error } = await sb
+    .from('profiles')
+    .select('*')
+    .neq('user_type', 'admin')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    container.innerHTML = `<p style="text-align:center; color:#999;">Erro ao carregar usuários: ${error.message}</p>`;
+    return;
+  }
+
+  if (!users || users.length === 0) {
+    container.innerHTML = '<p style="text-align:center; color:#999;">Nenhum usuário cadastrado ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = users.map(u => `
+    <div style="background: var(--light-bg); padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+      <div>
+        <strong>${u.name}</strong>
+        <span style="background:${u.user_type === 'ong' ? 'var(--primary-green)' : 'var(--primary-blue)'}; color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:999px; margin-left:0.5rem;">${u.user_type === 'ong' ? 'ONG' : 'Adotador'}</span>
+        ${u.is_verified ? '<span style="color: var(--primary-green); font-size:0.8rem; margin-left:0.5rem;">✔ Verificado</span>' : ''}
+        ${u.is_blocked ? '<span style="color:#d33; font-size:0.8rem; margin-left:0.5rem;">🚫 Bloqueado</span>' : ''}
+        <p style="font-size:0.85rem; color:#666; margin:0.25rem 0 0 0;">${u.email}${u.city ? ' • ' + u.city : ''}</p>
+      </div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="adminToggleVerified('${u.id}', ${!u.is_verified})">${u.is_verified ? 'Remover verificação' : 'Verificar'}</button>
+        <button class="btn-secondary" onclick="adminToggleBlocked('${u.id}', ${!u.is_blocked})">${u.is_blocked ? 'Desbloquear' : 'Bloquear'}</button>
+        <button class="btn-secondary" onclick="adminDeleteUser('${u.id}', '${u.name.replace(/'/g, "\\'")}')">Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function adminToggleVerified(userId, newValue) {
+  const { error } = await sb.from('profiles').update({ is_verified: newValue }).eq('id', userId);
+  if (error) { alert('Erro ao atualizar verificação: ' + error.message); return; }
+  renderAdminUsersList();
+}
+
+async function adminToggleBlocked(userId, newValue) {
+  const { error } = await sb.from('profiles').update({ is_blocked: newValue }).eq('id', userId);
+  if (error) { alert('Erro ao atualizar bloqueio: ' + error.message); return; }
+  renderAdminUsersList();
+}
+
+async function adminDeleteUser(userId, userName) {
+  const confirmed = confirm(
+    `Excluir "${userName}"? Isso remove o perfil e todos os dados vinculados (pets, solicitações, favoritos).\n\n` +
+    `Observação: o login (e-mail/senha) dessa pessoa continuará existindo no sistema de autenticação — ` +
+    `para remover totalmente o acesso, é necessário excluir também pelo painel do Supabase (Authentication > Users).`
+  );
+  if (!confirmed) return;
+
+  const { error } = await sb.from('profiles').delete().eq('id', userId);
+  if (error) { alert('Erro ao excluir usuário: ' + error.message); return; }
+  renderAdminUsersList();
+}
+
+// ============================================================================
+// VERIFICAÇÃO EM DUAS ETAPAS (demonstração acadêmica — sem envio real de SMS)
+// ============================================================================
+let pendingVerificationCode = null;
+
+function loadTwoFactorStatus() {
+  const statusBox = document.getElementById('twoFactorStatus');
+  const verified = currentUser.two_factor_verified;
+
+  statusBox.innerHTML = verified
+    ? `<p style="color: var(--primary-green); font-weight:bold; margin:0;">✔ Conta verificada em duas etapas</p>`
+    : `<p style="color:#d97706; font-weight:bold; margin:0;">⚠ Conta ainda não verificada</p>`;
+
+  document.getElementById('twoFactorPhone').value = currentUser.phone || '';
+  document.getElementById('verificationCodeBox').style.display = 'none';
+  document.getElementById('verificationCodeInput').value = '';
+}
+
+async function sendVerificationCode() {
+  const phone = document.getElementById('twoFactorPhone').value.trim();
+
+  if (!phone) {
+    alert('Informe um telefone para receber o código.');
+    return;
+  }
+
+  // Salva o telefone informado no perfil, caso ainda não estivesse cadastrado
+  await sb.from('profiles').update({ phone }).eq('id', currentUser.id);
+  currentUser.phone = phone;
+
+  pendingVerificationCode = String(Math.floor(100000 + Math.random() * 900000));
+
+  // DEMONSTRAÇÃO ACADÊMICA: sem um serviço de SMS pago (ex.: Twilio) configurado,
+  // não há envio real. O código é exibido aqui para simular o recebimento.
+  alert(
+    `📧 Código enviado para o e-mail: ${currentUser.email}\n` +
+    `📱 Código enviado por SMS para: ${phone}\n\n` +
+    `(Simulação para fins acadêmicos — código: ${pendingVerificationCode})`
+  );
+
+  document.getElementById('verificationCodeBox').style.display = 'block';
+}
+
+async function confirmVerificationCode() {
+  const typed = document.getElementById('verificationCodeInput').value.trim();
+
+  if (!pendingVerificationCode) {
+    alert('Clique em "Enviar Código de Verificação" primeiro.');
+    return;
+  }
+
+  if (typed !== pendingVerificationCode) {
+    alert('Código incorreto. Tente novamente.');
+    return;
+  }
+
+  const { error } = await sb.from('profiles').update({ two_factor_verified: true }).eq('id', currentUser.id);
+  if (error) {
+    alert('Erro ao confirmar verificação: ' + error.message);
+    return;
+  }
+
+  currentUser.two_factor_verified = true;
+  pendingVerificationCode = null;
+  loadTwoFactorStatus();
+  alert('Conta verificada com sucesso! ✔');
 }
