@@ -294,6 +294,22 @@ async function logout() {
   alert('Você foi desconectado!');
 }
 
+function getRoleLabel(userType) {
+  const labels = {
+    admin: 'Administrador',
+    supervisor: 'Supervisor',
+    ong: 'Usuário · ONG',
+    adopter: 'Usuário · Adotador'
+  };
+  return labels[userType] || 'Usuário';
+}
+
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function updateHeader() {
   const btnLogin = document.getElementById('btnLogin');
   const btnProfile = document.getElementById('btnProfile');
@@ -306,12 +322,16 @@ function updateHeader() {
     btnProfile.style.display = 'block';
     document.getElementById('userName').textContent = currentUser.name;
 
-    adminPanelLink.style.display = currentUser.user_type === 'admin' ? 'block' : 'none';
+    const isStaff = currentUser.user_type === 'admin' || currentUser.user_type === 'supervisor';
+    adminPanelLink.style.display = isStaff ? 'block' : 'none';
+    adminPanelLink.textContent = currentUser.user_type === 'admin' ? 'Painel ADM' : 'Painel do Supervisor';
+    const roleLabel = document.getElementById('profileRoleLabel');
+    if (roleLabel) roleLabel.textContent = '🏷️ ' + getRoleLabel(currentUser.user_type);
 
     if (currentUser.user_type === 'ong') {
       ongAdminLink.style.display = 'block';
       btnNotifications.style.display = 'none';
-    } else if (currentUser.user_type === 'admin') {
+    } else if (isStaff) {
       ongAdminLink.style.display = 'none';
       btnNotifications.style.display = 'none';
     } else {
@@ -444,8 +464,8 @@ function showPage(page) {
     }
     switchAdminTab('dashboard');
   } else if (page === 'admin-panel') {
-    if (!currentUser || currentUser.user_type !== 'admin') {
-      alert('Apenas administradores têm acesso a esse painel.');
+    if (!currentUser || !['admin', 'supervisor'].includes(currentUser.user_type)) {
+      alert('Apenas Administradores e Supervisores têm acesso a esse painel.');
       showPage('home');
       return;
     }
@@ -1446,16 +1466,24 @@ function addSupportMessage(sender, text) {
 // ============================================================================
 async function renderAdminUsersList() {
   const container = document.getElementById('adminUsersList');
+  const isAdmin = currentUser && currentUser.user_type === 'admin';
+  const titleEl = document.getElementById('adminPanelTitle');
+  const subEl = document.getElementById('adminPanelSubtitle');
+  if (titleEl) titleEl.textContent = isAdmin ? 'Painel Administrativo - Administrador' : 'Painel do Supervisor';
+  if (subEl) subEl.textContent = isAdmin
+    ? 'Controle total: verifique, bloqueie e exclua contas, e promova usuários a Supervisor.'
+    : 'Modere as contas de Usuários (adotadores e ONGs): verifique e bloqueie/desbloqueie.';
+
   container.innerHTML = '<p style="text-align:center; color:#999;">Carregando usuários...</p>';
 
-  const { data: users, error } = await sb
-    .from('profiles')
-    .select('*')
-    .neq('user_type', 'admin')
-    .order('created_at', { ascending: false });
+  let query = sb.from('profiles').select('*').order('created_at', { ascending: false });
+  query = isAdmin
+    ? query.neq('user_type', 'admin')
+    : query.in('user_type', ['adopter', 'ong']);
+  const { data: users, error } = await query;
 
   if (error) {
-    container.innerHTML = `<p style="text-align:center; color:#999;">Erro ao carregar usuários: ${error.message}</p>`;
+    container.innerHTML = `<p style="text-align:center; color:#999;">Erro ao carregar usuários: ${escapeHtml(error.message)}</p>`;
     return;
   }
 
@@ -1464,22 +1492,41 @@ async function renderAdminUsersList() {
     return;
   }
 
-  container.innerHTML = users.map(u => `
+  const badgeColor = { ong: 'var(--primary-green)', adopter: 'var(--primary-blue)', supervisor: '#8e44ad' };
+
+  container.innerHTML = users.map(u => {
+    const isSup = u.user_type === 'supervisor';
+    const safeName = encodeURIComponent(u.name || '').replace(/'/g, '%27');
+    return `
     <div style="background: var(--light-bg); padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
       <div>
-        <strong>${u.name}</strong>
-        <span style="background:${u.user_type === 'ong' ? 'var(--primary-green)' : 'var(--primary-blue)'}; color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:999px; margin-left:0.5rem;">${u.user_type === 'ong' ? 'ONG' : 'Adotador'}</span>
+        <strong>${escapeHtml(u.name)}</strong>
+        <span style="background:${badgeColor[u.user_type] || '#999'}; color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:999px; margin-left:0.5rem;">${escapeHtml(getRoleLabel(u.user_type))}</span>
         ${u.is_verified ? '<span style="color: var(--primary-green); font-size:0.8rem; margin-left:0.5rem;">✔ Verificado</span>' : ''}
         ${u.is_blocked ? '<span style="color:#d33; font-size:0.8rem; margin-left:0.5rem;">🚫 Bloqueado</span>' : ''}
-        <p style="font-size:0.85rem; color:#666; margin:0.25rem 0 0 0;">${u.email}${u.city ? ' • ' + u.city : ''}</p>
+        <p style="font-size:0.85rem; color:#666; margin:0.25rem 0 0 0;">${escapeHtml(u.email)}${u.city ? ' • ' + escapeHtml(u.city) : ''}</p>
       </div>
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
         <button class="btn-secondary" onclick="adminToggleVerified('${u.id}', ${!u.is_verified})">${u.is_verified ? 'Remover verificação' : 'Verificar'}</button>
         <button class="btn-secondary" onclick="adminToggleBlocked('${u.id}', ${!u.is_blocked})">${u.is_blocked ? 'Desbloquear' : 'Bloquear'}</button>
-        <button class="btn-secondary" onclick="adminDeleteUser('${u.id}', '${u.name.replace(/'/g, "\\'")}')">Excluir</button>
+        ${isAdmin ? (isSup
+          ? `<button class="btn-secondary" onclick="adminSetRole('${u.id}', 'adopter')">Remover Supervisão</button>`
+          : `<button class="btn-secondary" onclick="adminSetRole('${u.id}', 'supervisor')">Tornar Supervisor</button>`) : ''}
+        ${isAdmin ? `<button class="btn-secondary" onclick="adminDeleteUser('${u.id}', decodeURIComponent('${safeName}'))">Excluir</button>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+}
+
+async function adminSetRole(userId, newRole) {
+  if (!currentUser || currentUser.user_type !== 'admin') return;
+  const msg = newRole === 'supervisor'
+    ? 'Tornar esta conta Supervisor? Ela poderá verificar e bloquear usuários.'
+    : 'Remover a supervisão desta conta? Ela volta a ser Usuário (Adotador).';
+  if (!confirm(msg)) return;
+  const { error } = await sb.from('profiles').update({ user_type: newRole }).eq('id', userId);
+  if (error) { alert('Erro ao alterar o papel: ' + error.message); return; }
+  renderAdminUsersList();
 }
 
 async function adminToggleVerified(userId, newValue) {
