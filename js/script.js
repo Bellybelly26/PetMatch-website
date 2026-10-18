@@ -900,14 +900,31 @@ async function renderMyRequests() {
     return;
   }
 
-  list.innerHTML = requests.map(req => `
-    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border-left: 4px solid var(--primary-blue);">
-      <h3>${req.pets ? req.pets.name : 'Pet removido'}</h3>
-      <p><strong>Data:</strong> ${new Date(req.created_at).toLocaleDateString()}</p>
-      ${renderProgressBar(req.status)}
-      <button class="btn-primary" style="margin-top:1rem;" onclick="showOngContact('${req.pets ? req.pets.ong_id : ''}')">Contato da ONG</button>
-    </div>
-  `).join('');
+  const statusLabels = { pending: 'Pendente', approved: 'Aprovada', rejected: 'Rejeitada', visit_scheduled: 'Visita agendada', completed: 'Adoção concluída' };
+
+  list.innerHTML = requests.map(req => {
+    const a = adopterById[req.adopter_id] || {};
+    return `
+    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
+      <h4>${escapeHtml(req.pets.name)}</h4>
+      <p><strong>Adotador:</strong> ${escapeHtml(a.name || 'Desconhecido')}${a.is_verified ? ' <span style="color: var(--primary-green); font-size:0.8rem;">✔ Verificado</span>' : ''}</p>
+      <p><strong>E-mail:</strong> ${escapeHtml(a.email || '—')}</p>
+      <p><strong>Telefone:</strong> ${escapeHtml(a.phone || 'Não informado')}</p>
+      <p><strong>Cidade:</strong> ${escapeHtml(a.city || 'Não informada')}</p>
+      <p><strong>Status:</strong> ${escapeHtml(statusLabels[req.status] || req.status)}</p>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="showProfileDetails('${req.adopter_id}')">Ver perfil completo</button>
+        ${req.status === 'pending' ? `
+          <button class="btn-primary" onclick="approveRequest('${req.id}')">Aprovar</button>
+          <button class="btn-secondary" onclick="rejectRequest('${req.id}')">Rejeitar</button>
+        ` : req.status === 'approved' ? `
+          <button class="btn-primary" onclick="scheduleVisit('${req.id}')">Agendar Visita</button>
+        ` : req.status === 'visit_scheduled' ? `
+          <button class="btn-primary" onclick="completeAdoption('${req.id}')">Concluir Adoção</button>
+        ` : ''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderProgressBar(status) {
@@ -1199,8 +1216,8 @@ async function renderAdminRequests() {
   }
 
   const adopterIds = [...new Set(requests.map(r => r.adopter_id))];
-  const { data: adopters } = await sb.from('profiles').select('id, name').in('id', adopterIds);
-  const adopterNameById = Object.fromEntries((adopters || []).map(a => [a.id, a.name]));
+  const { data: adopters } = await sb.from('profiles').select('id, name, email, phone, city, is_verified').in('id', adopterIds);
+  const adopterById = Object.fromEntries((adopters || []).map(a => [a.id, a]));
 
   list.innerHTML = requests.map(req => `
     <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
@@ -1507,6 +1524,7 @@ async function renderAdminUsersList() {
         <p style="font-size:0.85rem; color:#666; margin:0.25rem 0 0 0;">${escapeHtml(u.email)}${u.city ? ' • ' + escapeHtml(u.city) : ''}</p>
       </div>
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="showProfileDetails('${u.id}')">Ver detalhes</button>
         <button class="btn-secondary" onclick="adminToggleVerified('${u.id}', ${!u.is_verified})">${u.is_verified ? 'Remover verificação' : 'Verificar'}</button>
         <button class="btn-secondary" onclick="adminToggleBlocked('${u.id}', ${!u.is_blocked})">${u.is_blocked ? 'Desbloquear' : 'Bloquear'}</button>
         ${isAdmin ? (isSup
@@ -1527,6 +1545,65 @@ async function adminSetRole(userId, newRole) {
   const { error } = await sb.from('profiles').update({ user_type: newRole }).eq('id', userId);
   if (error) { alert('Erro ao alterar o papel: ' + error.message); return; }
   renderAdminUsersList();
+}
+
+// ----------------------------------------------------------------------------
+// Detalhes da conta (usado por Administrador, Supervisor e ONGs)
+// ----------------------------------------------------------------------------
+async function showProfileDetails(userId) {
+  const modal = document.getElementById('profileDetailModal');
+  const box = document.getElementById('profileDetailContent');
+  box.innerHTML = '<p style="text-align:center; color:#999;">Carregando...</p>';
+  modal.classList.add('active');
+
+  const { data: u, error } = await sb.from('profiles').select('*').eq('id', userId).single();
+  if (error || !u) {
+    box.innerHTML = '<p style="text-align:center; color:#999;">Não foi possível carregar os dados desta conta.</p>';
+    return;
+  }
+
+  // Resumo de atividade (só contagens; falha silenciosa se a política do banco não permitir)
+  let activity = '';
+  if (u.user_type === 'ong') {
+    const { count } = await sb.from('pets').select('id', { count: 'exact', head: true }).eq('ong_id', u.id);
+    activity = `<p><strong>Pets cadastrados:</strong> ${count ?? '—'}</p>`;
+  } else if (u.user_type === 'adopter') {
+    const { count } = await sb.from('adoption_requests').select('id', { count: 'exact', head: true }).eq('adopter_id', u.id);
+    activity = `<p><strong>Solicitações de adoção:</strong> ${count ?? '—'}</p>`;
+  }
+
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
+  const photos = (u.residence_photos || []).map(url =>
+    `<img src="${escapeHtml(url)}" style="width:100px; height:100px; object-fit:cover; border-radius:8px;">`).join('');
+  const videos = (u.residence_videos || []).length;
+
+  box.innerHTML = `
+    <div style="text-align:center; margin-bottom:1rem;">
+      ${u.profile_photo_url
+        ? `<img src="${escapeHtml(u.profile_photo_url)}" style="width:110px; height:110px; object-fit:cover; border-radius:50%;">`
+        : '<div style="font-size:3.5rem;">👤</div>'}
+      <h3 style="margin:0.5rem 0 0.25rem;">${escapeHtml(u.name)}</h3>
+      <span style="background: var(--primary-blue); color:#fff; font-size:0.75rem; padding:2px 10px; border-radius:999px;">${escapeHtml(getRoleLabel(u.user_type))}</span>
+    </div>
+    <p><strong>E-mail:</strong> ${escapeHtml(u.email)}</p>
+    <p><strong>Telefone:</strong> ${escapeHtml(u.phone || 'Não informado')}</p>
+    <p><strong>Endereço:</strong> ${escapeHtml(u.address || 'Não informado')}</p>
+    <p><strong>Cidade:</strong> ${escapeHtml(u.city || 'Não informada')}</p>
+    <p><strong>Conta criada em:</strong> ${fmtDate(u.created_at)}</p>
+    <p><strong>Verificação da conta:</strong> ${u.is_verified ? '✔ Verificada' : 'Ainda não verificada'}</p>
+    <p><strong>Verificação em duas etapas:</strong> ${u.two_factor_verified ? '✔ Concluída' : 'Não concluída'}</p>
+    <p><strong>Situação:</strong> ${u.is_blocked ? '🚫 Bloqueada' : 'Ativa'}</p>
+    ${activity}
+    ${u.user_type === 'adopter' ? `
+      <p><strong>Fotos da residência:</strong> ${photos ? '' : 'Nenhuma enviada'}</p>
+      ${photos ? `<div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.75rem;">${photos}</div>` : ''}
+      <p><strong>Vídeos da residência:</strong> ${videos ? videos + ' enviado(s)' : 'Nenhum enviado'}</p>` : ''}
+    <button class="btn-secondary" style="width:100%; margin-top:1rem;" onclick="closeProfileDetailModal()">Fechar</button>
+  `;
+}
+
+function closeProfileDetailModal() {
+  document.getElementById('profileDetailModal').classList.remove('active');
 }
 
 async function adminToggleVerified(userId, newValue) {
