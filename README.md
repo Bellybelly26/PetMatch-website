@@ -24,6 +24,17 @@ Plataforma web para adoção de animais de estimação, conectando adotadores co
 - ✅ Agendar visitas pré-adoção
 - ✅ Concluir a adoção (marca o pet como adotado)
 
+### Hierarquia de acesso (Administrador > Supervisor > Usuário)
+| Nível | Quem é | O que pode fazer |
+|---|---|---|
+| **Administrador** | Conta criada pela equipe via SQL | Controle total: verificar, bloquear e excluir contas; promover um Usuário a Supervisor e remover a supervisão |
+| **Supervisor** | Promovido pelo Administrador | Moderar Usuários: verificar e bloquear/desbloquear (não exclui, não promove) |
+| **Usuário** | Cadastro público (Adotador ou ONG) | Adotador: explorar, favoritar, solicitar adoção e acompanhar. ONG: gerenciar pets, solicitações e visitas |
+
+- Administrador e Supervisor entram pelo mesmo login e veem o **Painel ADM** / **Painel do Supervisor** no menu do perfil, com o papel exibido no topo do menu.
+- O cadastro público só cria Usuários; Supervisor e Administrador nunca são criados pelo site aberto.
+- As regras são aplicadas no banco (RLS + trigger `protect_profile_privileged_columns`), não só na tela.
+
 ### Geral
 - ✅ Design responsivo (mobile, tablet, desktop)
 - ✅ Seção "Como Funciona", com o passo a passo para adotadores e para ONGs
@@ -102,6 +113,8 @@ PetMatch-website-main/
 ├── supabase-policies-and-trigger.sql                    # Script 2: segurança (RLS), storage e trigger
 ├── supabase-add-video.sql                                # Script 3: campo de vídeo dos pets
 ├── supabase-add-progress-health-notifications.sql        # Script 4: saúde, progresso e notificações
+├── supabase-add-admin-and-verification.sql               # Script 5: Painel ADM e verificação em duas etapas
+├── supabase-add-supervisor-hierarchy.sql                 # Script 6: hierarquia Administrador > Supervisor > Usuário
 ├── supabase-seed-pets-exemplo.sql                        # Script opcional: pets de exemplo
 └── README.md                                             # Este arquivo
 ```
@@ -131,6 +144,11 @@ Todas as tabelas usam **Row Level Security (RLS)**: cada usuário só acessa e m
 2. Acesse o "Painel ONG"
 3. Cadastre seus pets (foto, vídeo, saúde, comportamento)
 4. Gerencie as solicitações recebidas: aprove, agende visita e conclua a adoção
+
+### Como Administrador ou Supervisor
+1. Entre com a conta (Administrador ou Supervisor) pelo login normal
+2. Abra o menu do perfil → "Painel ADM" (ou "Painel do Supervisor")
+3. Verifique ou bloqueie contas; o Administrador também exclui e promove a Supervisor
 
 ## 🎓 Projeto Acadêmico
 

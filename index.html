@@ -42,6 +42,7 @@
 
     <!-- PROFILE MENU -->
     <div id="profileMenu" class="profile-menu" style="display:none;">
+      <div id="profileRoleLabel" style="padding:0.5rem 1rem; font-size:0.8rem; opacity:0.85; font-weight:bold;"></div>
       <a href="#" onclick="showPage('adopter-profile')">Meu Perfil</a>
       <a href="#" onclick="showPage('my-requests')">Minhas Solicitações</a>
       <a href="#" onclick="showPage('two-factor')">🔒 Verificação em Duas Etapas</a>
@@ -419,8 +420,8 @@
       <!-- ADMIN (ADM) PANEL PAGE -->
       <div id="page-admin-panel" class="page">
         <div class="admin-container">
-          <h2>Painel Administrativo - ADM</h2>
-          <p style="color:#777; margin-bottom:1.5rem;">Gerencie todas as contas de adotadores e ONGs cadastradas na plataforma.</p>
+          <h2 id="adminPanelTitle">Painel Administrativo - Administrador</h2>
+          <p id="adminPanelSubtitle" style="color:#777; margin-bottom:1.5rem;">Gerencie as contas cadastradas na plataforma.</p>
           <div id="adminUsersList"></div>
         </div>
       </div>
