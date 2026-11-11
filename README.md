@@ -38,7 +38,13 @@ Plataforma web para adoção de animais de estimação, conectando adotadores co
 ### Geral
 - ✅ Design responsivo (mobile, tablet, desktop)
 - ✅ Seção "Como Funciona", com o passo a passo para adotadores e para ONGs
-- ✅ Carrossel de histórias de sucesso (navegação manual, sem troca automática)
+- ✅ Página inicial com **Explorar Pets** (pets reais do banco) e uma animação do processo de adoção
+- ✅ Carrossel de histórias de sucesso na página Sobre (navegação manual, sem troca automática)
+- ✅ **Controle de histórico:** linha do tempo de cada solicitação de adoção ("Ver histórico"), para Adotador e ONG
+- ✅ **Ajuda e Reclamações:** perguntas frequentes e formulário (ajuda, reclamação ou sugestão); Administrador e Supervisor respondem pelo painel
+- ✅ **Log de sistema:** registro de auditoria (acessos, solicitações, moderação, pets, mensagens e LGPD), visível só ao Administrador, com filtro e download em CSV; ninguém altera nem apaga os registros
+- ✅ **Planos (assinaturas):** página com Grátis, Premium (adotador), ONG Destaque (mensal ou anual) e plano institucional para prefeituras (modelo de negócio do TCC, pagamento simulado)
+- ✅ **LGPD:** Política de Privacidade, consentimento no cadastro (registrado com data e versão), aviso de armazenamento no navegador, página "Meus Dados" para baixar os dados (JSON) e excluir a própria conta
 - ✅ Estatísticas da home com dados reais do banco (pets adotados, disponíveis e famílias felizes)
 - ✅ Depoimentos rotativos
 - ✅ Segurança via Row Level Security (RLS) no banco de dados
@@ -76,7 +82,10 @@ Crie um projeto gratuito em [supabase.com](https://supabase.com/dashboard), abra
 2. `supabase-policies-and-trigger.sql` — cria as políticas de segurança (RLS), os buckets de armazenamento e o trigger que gera o perfil do usuário automaticamente no cadastro
 3. `supabase-add-video.sql` — adiciona o campo de vídeo aos pets
 4. `supabase-add-progress-health-notifications.sql` — adiciona os campos de saúde/comportamento do pet, os status da barra de progresso e a tabela de notificações
-5. `supabase-seed-pets-exemplo.sql` *(opcional)* — cadastra alguns pets de exemplo para teste (é necessário trocar o `ong_id` pelo id de uma ONG já cadastrada)
+5. `supabase-add-admin-and-verification.sql` — adiciona Painel ADM (verificar, bloquear, excluir) e a verificação em duas etapas
+6. `supabase-add-supervisor-hierarchy.sql` — adiciona o nível Supervisor e as travas da hierarquia Administrador > Supervisor > Usuário
+7. `supabase-add-history-logs-help-lgpd.sql` — adiciona histórico das solicitações, log de sistema, ajuda e reclamações e LGPD
+8. `supabase-seed-pets-exemplo.sql` *(opcional)* — cadastra alguns pets de exemplo para teste (é necessário trocar o `ong_id` pelo id de uma ONG já cadastrada)
 
 **3. Configure as credenciais do projeto**
 
@@ -115,6 +124,7 @@ PetMatch-website-main/
 ├── supabase-add-progress-health-notifications.sql        # Script 4: saúde, progresso e notificações
 ├── supabase-add-admin-and-verification.sql               # Script 5: Painel ADM e verificação em duas etapas
 ├── supabase-add-supervisor-hierarchy.sql                 # Script 6: hierarquia Administrador > Supervisor > Usuário
+├── supabase-add-history-logs-help-lgpd.sql               # Script 7: histórico, log de sistema, ajuda e reclamações e LGPD
 ├── supabase-seed-pets-exemplo.sql                        # Script opcional: pets de exemplo
 └── README.md                                             # Este arquivo
 ```
@@ -127,6 +137,9 @@ PetMatch-website-main/
 - **adoption_requests** — solicitações de adoção, com status (`pending`, `approved`, `rejected`, `visit_scheduled`, `completed`)
 - **visits** — visitas pré-adoção agendadas pela ONG
 - **notifications** — notificações enviadas ao adotador a cada mudança de status
+- **request_history** — histórico de cada mudança de status das solicitações (gravado por gatilho)
+- **system_logs** — log de auditoria do sistema (gravado por gatilhos; só o Administrador lê)
+- **complaints** — mensagens de ajuda, reclamações e sugestões, com a resposta da moderação
 
 Todas as tabelas usam **Row Level Security (RLS)**: cada usuário só acessa e modifica os dados que lhe pertencem (ex.: uma ONG só edita seus próprios pets; um adotador só vê suas próprias solicitações e notificações).
 
