@@ -1326,3 +1326,455 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 1.25rem;
   text-align: center;
 }
+
+/* ===== EXPLORAR PETS (PÁGINA INICIAL) ===== */
+.explore-section {
+  padding: 3rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.explore-section h2 {
+  color: var(--primary-blue);
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.section-sub {
+  color: #777;
+  margin-bottom: 2rem;
+}
+
+.explore-section .pets-grid {
+  text-align: left;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 900px) {
+  .explore-section .pets-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .explore-section .pets-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== ANIMAÇÃO: DO PRIMEIRO CLIQUE AO NOVO LAR ===== */
+.journey-section {
+  padding: 2rem 2rem 3rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.journey-section h2 {
+  color: var(--primary-blue);
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.journey {
+  position: relative;
+}
+
+.journey-track {
+  position: relative;
+  height: 64px;
+  margin-bottom: 0.5rem;
+}
+
+.journey-track::after {
+  content: '';
+  position: absolute;
+  left: 12.5%;
+  right: 12.5%;
+  bottom: 8px;
+  border-bottom: 4px dashed #cfd8dc;
+}
+
+.journey-pet {
+  position: absolute;
+  bottom: 12px;
+  left: 12.5%;
+  transform: translateX(-50%);
+  font-size: 2.6rem;
+  line-height: 1;
+  animation: journeyWalk 8s ease-in-out infinite;
+}
+
+.journey-pet span {
+  display: inline-block;
+  animation: journeyBob 0.45s ease-in-out infinite alternate;
+}
+
+.journey-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.journey-step {
+  background: #fff;
+  border: 2px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  animation: journeyGlow 8s ease-in-out infinite;
+}
+
+.journey-step.s2 { animation-delay: 2.13s; }
+.journey-step.s3 { animation-delay: 4.27s; }
+.journey-step.s4 { animation-delay: 6.4s; }
+
+.journey-icon {
+  font-size: 2rem;
+}
+
+.journey-step b {
+  color: var(--primary-blue);
+}
+
+.journey-step small {
+  color: #777;
+  font-size: 0.8rem;
+}
+
+@keyframes journeyWalk {
+  0% { left: 12.5%; }
+  80% { left: 87.5%; }
+  100% { left: 87.5%; }
+}
+
+@keyframes journeyBob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-6px); }
+}
+
+@keyframes journeyGlow {
+  0% { transform: scale(1); background: #fff; border-color: var(--border-color); box-shadow: none; }
+  5%, 14% { transform: scale(1.06); background: #e8f6ec; border-color: var(--primary-green); box-shadow: 0 6px 18px rgba(43, 168, 74, 0.3); }
+  22%, 100% { transform: scale(1); background: #fff; border-color: var(--border-color); box-shadow: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-pet,
+  .journey-pet span,
+  .journey-step {
+    animation: none;
+  }
+  .journey-pet { left: 87.5%; }
+}
+
+@media (max-width: 600px) {
+  .journey-icon { font-size: 1.5rem; }
+  .journey-step small { display: none; }
+  .journey-pet { font-size: 2rem; }
+}
+
+/* ===== AJUDA: PERGUNTAS FREQUENTES ===== */
+.faq-list details {
+  background: var(--light-bg);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.faq-list summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--primary-blue);
+}
+
+.faq-list details p {
+  margin-top: 0.6rem;
+  color: #555;
+}
+
+/* ===== LGPD ===== */
+.lgpd-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.lgpd-action {
+  background: var(--light-bg);
+  border-radius: 12px;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.lgpd-action p {
+  color: #666;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.consent-check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.consent-check input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.lgpd-banner {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 900;
+  max-width: 760px;
+  margin: 0 auto;
+  background: #fff;
+  border: 2px solid var(--primary-blue);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  padding: 1rem 1.25rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.lgpd-banner p {
+  flex: 1 1 280px;
+}
+
+.lgpd-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.privacy-text ul {
+  margin: 0.5rem 0 0 1.25rem;
+}
+
+.privacy-text li {
+  margin-bottom: 0.4rem;
+}
+
+/* ===== LOGS DO SISTEMA ===== */
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.log-table th,
+.log-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.log-table th {
+  background: var(--light-bg);
+  color: var(--primary-blue);
+}
+
+/* ===== PLANOS PARA PREFEITURAS ===== */
+.plans-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 3rem;
+  text-align: center;
+}
+
+.plans-container h2 {
+  color: var(--primary-blue);
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.plans-lead {
+  color: #555;
+  max-width: 720px;
+  margin: 0 auto 2rem;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.plan-card {
+  position: relative;
+  background: #fff;
+  border: 2px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plan-featured {
+  border-color: var(--primary-green);
+  box-shadow: 0 10px 28px rgba(43, 168, 74, 0.22);
+}
+
+.plan-badge {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary-green);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 999px;
+}
+
+.plan-card h3 {
+  color: var(--primary-blue);
+  font-size: 1.5rem;
+}
+
+.plan-for {
+  color: #777;
+  margin-top: -0.5rem;
+}
+
+.plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  flex: 1;
+}
+
+.plan-features li {
+  padding: 0.45rem 0 0.45rem 1.6rem;
+  position: relative;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.95rem;
+}
+
+.plan-features li::before {
+  content: '✔';
+  position: absolute;
+  left: 0;
+  color: var(--primary-green);
+  font-weight: 700;
+}
+
+.plan-soon {
+  background: #fff3d6;
+  color: #9a6a00;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
+
+.plan-price {
+  font-weight: 700;
+  color: #333;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.plan-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
+
+.plans-note {
+  color: #888;
+  font-size: 0.85rem;
+  margin: 1.25rem auto 0;
+  max-width: 760px;
+}
+
+.plans-subtitle {
+  color: var(--primary-blue);
+  margin: 2.5rem 0 1rem;
+  font-size: 1.4rem;
+}
+
+.plans-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  text-align: left;
+}
+
+.plans-step {
+  background: var(--light-bg);
+  border-radius: 12px;
+  padding: 1.1rem;
+}
+
+.plans-step span {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-blue);
+  color: #fff;
+  border-radius: 50%;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.plans-step b {
+  display: block;
+  color: var(--primary-blue);
+  margin-bottom: 0.25rem;
+}
+
+.plans-step p {
+  font-size: 0.88rem;
+  color: #555;
+}
+
+.plans-roles {
+  max-width: 760px;
+  margin: 0 auto;
+  color: #555;
+}
+
+@media (max-width: 900px) {
+  .plans-grid { grid-template-columns: 1fr; }
+  .plans-steps { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .plans-steps { grid-template-columns: 1fr; }
+}
+
+/* ===== ASSINATURAS ===== */
+.billing-toggle { display:inline-flex; background:var(--light-bg); border-radius:999px; padding:4px; margin:0 auto 1.75rem; }
+.billing-toggle button { border:0; background:transparent; padding:8px 20px; border-radius:999px; font-weight:600; cursor:pointer; color:#555; font-family:inherit; }
+.billing-toggle button.active { background:var(--primary-blue); color:#fff; }
+.billing-save { font-size:0.7rem; background:#fff3d6; color:#9a6a00; padding:1px 8px; border-radius:999px; margin-left:4px; }
+.plan-amount { font-size:1.9rem; color:var(--primary-blue); }
+.plan-period { color:#777; font-weight:400; }
+.plans-gov { margin:2.5rem auto 0; max-width:760px; background:var(--light-bg); border-radius:16px; padding:1.5rem; text-align:center; }
+.plans-gov h3 { color:var(--primary-blue); margin-bottom:0.5rem; }
+.plans-gov p { color:#555; margin-bottom:1rem; }
+.plans-gov .plan-btn { display:inline-block; padding:0.6rem 1.5rem; }
+button.plan-btn { width:100%; cursor:pointer; font-family:inherit; }
