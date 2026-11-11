@@ -27,7 +27,7 @@ let editingPetId = null;    // usado pelo formulário de adicionar/editar pet
 
 // ===== INICIALIZAÇÃO =====
 document.addEventListener('DOMContentLoaded', () => {
-  restoreSession();
+  restoreSession().then(renderLgpdBanner);
   showPage('home');
   loadStats();
   startTestimonialAutoPlay();
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadStats() {
-  // As 4 "Histórias de Sucesso" em destaque na home já representam adoções e
+  // As 4 "Histórias de Sucesso" (página Sobre) já representam adoções e
   // famílias felizes reais — por isso somamos como ponto de partida em ambos
   // os números, e a partir daí eles crescem de verdade junto com o sistema.
   const FEATURED_SUCCESS_STORIES = 4;
@@ -195,6 +195,7 @@ async function handleLogin() {
   closeAuthModal();
   updateHeader();
   showPage('home');
+  logClientEvent('login');
   alert(`Bem-vindo, ${currentUser.name}!`);
 }
 
@@ -213,13 +214,18 @@ async function handleSignup() {
     return;
   }
 
+  if (!document.getElementById('signupConsent').checked) {
+    alert('Para se cadastrar, aceite a Política de Privacidade (LGPD).');
+    return;
+  }
+
   // name/user_type vão em options.data (user_metadata); o trigger
   // on_auth_user_created (supabase-auth-trigger.sql) usa esses dados
   // para criar a linha em public.profiles automaticamente.
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { name, user_type: 'adopter' } }
+    options: { data: { name, user_type: 'adopter', lgpd_consent: 'true' } }
   });
 
   if (error) {
@@ -234,7 +240,7 @@ async function handleSignup() {
     return;
   }
 
-  currentUser = { id: data.user.id, email, name, user_type: 'adopter' };
+  currentUser = { id: data.user.id, email, name, user_type: 'adopter', lgpd_consent_at: new Date().toISOString() };
   closeAuthModal();
   updateHeader();
   showPage('home');
@@ -259,12 +265,17 @@ async function handleOngSignup() {
     return;
   }
 
+  if (!document.getElementById('ongConsent').checked) {
+    alert('Para cadastrar a ONG, aceite a Política de Privacidade (LGPD).');
+    return;
+  }
+
   // Mesma lógica do adotador: os dados vão em options.data e o trigger
   // cria a linha em public.profiles automaticamente.
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { name, user_type: 'ong', phone, address, city } }
+    options: { data: { name, user_type: 'ong', phone, address, city, lgpd_consent: 'true' } }
   });
 
   if (error) {
@@ -278,7 +289,7 @@ async function handleOngSignup() {
     return;
   }
 
-  currentUser = { id: data.user.id, email, name, user_type: 'ong', phone, address, city };
+  currentUser = { id: data.user.id, email, name, user_type: 'ong', phone, address, city, lgpd_consent_at: new Date().toISOString() };
   closeAuthModal();
   updateHeader();
   showPage('ong-admin');
@@ -286,6 +297,7 @@ async function handleOngSignup() {
 }
 
 async function logout() {
+  await logClientEvent('logout');
   await sb.auth.signOut();
   currentUser = null;
   updateHeader();
@@ -346,6 +358,7 @@ function updateHeader() {
     ongAdminLink.style.display = 'none';
     adminPanelLink.style.display = 'none';
   }
+  renderLgpdBanner();
 }
 
 function toggleProfileMenu() {
@@ -469,7 +482,18 @@ function showPage(page) {
       showPage('home');
       return;
     }
-    renderAdminUsersList();
+    const logsBtn = document.getElementById('staffTabBtn-logs');
+    if (logsBtn) logsBtn.style.display = currentUser.user_type === 'admin' ? '' : 'none';
+    switchStaffTab('users');
+  } else if (page === 'help') {
+    loadHelpPage();
+  } else if (page === 'lgpd') {
+    if (!currentUser) {
+      alert('Faça login para acessar os seus dados.');
+      showPage('home');
+      return;
+    }
+    loadLgpdPage();
   } else if (page === 'two-factor') {
     if (!currentUser) {
       alert('Faça login para acessar a verificação em duas etapas.');
@@ -587,6 +611,7 @@ async function renderPets() {
 }
 
 function applyPetFilters() {
+  renderHomePets();
   const grid = document.getElementById('petsGrid');
   grid.innerHTML = '';
 
@@ -607,28 +632,43 @@ function applyPetFilters() {
     return;
   }
 
-  pets.forEach(pet => {
-    const isFavorite = myFavoritePetIds.includes(pet.id);
-    const card = document.createElement('div');
-    card.className = 'pet-card';
-    card.innerHTML = `
-      <img src="${pet.image_url || 'images/pet-dog-brown-1.png'}" alt="${pet.name}" class="pet-image">
-      <div class="pet-info">
-        <div class="pet-name">${pet.name}</div>
-        <div class="pet-details">${pet.breed}</div>
-        <div class="pet-details">${pet.age} anos • ${pet.size}</div>
-        <div class="pet-details">📍 ${pet.city}</div>
-        <div class="pet-details">🏠 ${pet.ongName || 'ONG não identificada'}</div>
-        <div class="pet-actions">
-          <button class="btn-favorite ${isFavorite ? 'active' : ''}" onclick="toggleFavorite('${pet.id}')">
-            ${isFavorite ? '❤️' : '🤍'}
-          </button>
-          <button class="btn-adopt" onclick="openPetDetail('${pet.id}')">Detalhes</button>
-        </div>
+  pets.forEach(pet => grid.appendChild(buildPetCard(pet)));
+}
+
+function buildPetCard(pet) {
+  const isFavorite = myFavoritePetIds.includes(pet.id);
+  const card = document.createElement('div');
+  card.className = 'pet-card';
+  card.innerHTML = `
+    <img src="${escapeHtml(pet.image_url || 'images/pet-dog-brown-1.png')}" alt="${escapeHtml(pet.name)}" class="pet-image">
+    <div class="pet-info">
+      <div class="pet-name">${escapeHtml(pet.name)}</div>
+      <div class="pet-details">${escapeHtml(pet.breed)}</div>
+      <div class="pet-details">${escapeHtml(pet.age)} anos • ${escapeHtml(pet.size)}</div>
+      <div class="pet-details">📍 ${escapeHtml(pet.city)}</div>
+      <div class="pet-details">🏠 ${escapeHtml(pet.ongName || 'ONG não identificada')}</div>
+      <div class="pet-actions">
+        <button class="btn-favorite ${isFavorite ? 'active' : ''}" onclick="toggleFavorite('${pet.id}')">
+          ${isFavorite ? '❤️' : '🤍'}
+        </button>
+        <button class="btn-adopt" onclick="openPetDetail('${pet.id}')">Detalhes</button>
       </div>
-    `;
-    grid.appendChild(card);
-  });
+    </div>
+  `;
+  return card;
+}
+
+// Página inicial: mostra os primeiros pets disponíveis (mesmos dados da página "Pets")
+function renderHomePets() {
+  const grid = document.getElementById('homePetsGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const pets = allPets.slice(0, 6);
+  if (pets.length === 0) {
+    grid.innerHTML = '<p style="text-align:center; color:#999; grid-column: 1 / -1;">Nenhum pet disponível no momento.</p>';
+    return;
+  }
+  pets.forEach(pet => grid.appendChild(buildPetCard(pet)));
 }
 
 function filterPets() {
@@ -891,7 +931,7 @@ async function renderMyRequests() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    list.innerHTML = `<p style="text-align:center; color:#999;">Erro ao carregar solicitações: ${error.message}</p>`;
+    list.innerHTML = `<p style="text-align:center; color:#999;">Erro ao carregar solicitações: ${escapeHtml(error.message)}</p>`;
     return;
   }
 
@@ -900,28 +940,17 @@ async function renderMyRequests() {
     return;
   }
 
-  const statusLabels = { pending: 'Pendente', approved: 'Aprovada', rejected: 'Rejeitada', visit_scheduled: 'Visita agendada', completed: 'Adoção concluída' };
-
   list.innerHTML = requests.map(req => {
-    const a = adopterById[req.adopter_id] || {};
+    const petName = req.pets ? req.pets.name : 'Pet removido';
     return `
-    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
-      <h4>${escapeHtml(req.pets.name)}</h4>
-      <p><strong>Adotador:</strong> ${escapeHtml(a.name || 'Desconhecido')}${a.is_verified ? ' <span style="color: var(--primary-green); font-size:0.8rem;">✔ Verificado</span>' : ''}</p>
-      <p><strong>E-mail:</strong> ${escapeHtml(a.email || '—')}</p>
-      <p><strong>Telefone:</strong> ${escapeHtml(a.phone || 'Não informado')}</p>
-      <p><strong>Cidade:</strong> ${escapeHtml(a.city || 'Não informada')}</p>
-      <p><strong>Status:</strong> ${escapeHtml(statusLabels[req.status] || req.status)}</p>
+    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border-left: 4px solid var(--primary-blue);">
+      <h3>${escapeHtml(petName)}</h3>
+      <p><strong>Status:</strong> ${escapeHtml(STATUS_LABELS[req.status] || req.status)}</p>
+      <p><strong>Data:</strong> ${new Date(req.created_at).toLocaleDateString('pt-BR')}</p>
+      ${renderProgressBar(req.status)}
       <div style="display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;">
-        <button class="btn-secondary" onclick="showProfileDetails('${req.adopter_id}')">Ver perfil completo</button>
-        ${req.status === 'pending' ? `
-          <button class="btn-primary" onclick="approveRequest('${req.id}')">Aprovar</button>
-          <button class="btn-secondary" onclick="rejectRequest('${req.id}')">Rejeitar</button>
-        ` : req.status === 'approved' ? `
-          <button class="btn-primary" onclick="scheduleVisit('${req.id}')">Agendar Visita</button>
-        ` : req.status === 'visit_scheduled' ? `
-          <button class="btn-primary" onclick="completeAdoption('${req.id}')">Concluir Adoção</button>
-        ` : ''}
+        <button class="btn-primary" onclick="showOngContact('${req.pets ? req.pets.ong_id : ''}')">Contato da ONG</button>
+        <button class="btn-secondary" onclick="showRequestHistory('${req.id}', ${jsStr(petName)})">Ver histórico</button>
       </div>
     </div>`;
   }).join('');
@@ -1206,7 +1235,7 @@ async function renderAdminRequests() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    list.innerHTML = `<p style="text-align:center; color:#999;">Erro: ${error.message}</p>`;
+    list.innerHTML = `<p style="text-align:center; color:#999;">Erro: ${escapeHtml(error.message)}</p>`;
     return;
   }
 
@@ -1219,12 +1248,19 @@ async function renderAdminRequests() {
   const { data: adopters } = await sb.from('profiles').select('id, name, email, phone, city, is_verified').in('id', adopterIds);
   const adopterById = Object.fromEntries((adopters || []).map(a => [a.id, a]));
 
-  list.innerHTML = requests.map(req => `
+  list.innerHTML = requests.map(req => {
+    const a = adopterById[req.adopter_id] || {};
+    return `
     <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
-      <h4>${req.pets.name}</h4>
-      <p><strong>Adotador:</strong> ${adopterNameById[req.adopter_id] || 'Desconhecido'}</p>
-      <p><strong>Status:</strong> ${req.status}</p>
-      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+      <h4>${escapeHtml(req.pets.name)}</h4>
+      <p><strong>Adotador:</strong> ${escapeHtml(a.name || 'Desconhecido')}${a.is_verified ? ' <span style="color: var(--primary-green); font-size:0.8rem;">✔ Verificado</span>' : ''}</p>
+      <p><strong>E-mail:</strong> ${escapeHtml(a.email || '—')}</p>
+      <p><strong>Telefone:</strong> ${escapeHtml(a.phone || 'Não informado')}</p>
+      <p><strong>Cidade:</strong> ${escapeHtml(a.city || 'Não informada')}</p>
+      <p><strong>Status:</strong> ${escapeHtml(STATUS_LABELS[req.status] || req.status)}</p>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="showProfileDetails('${req.adopter_id}')">Ver perfil completo</button>
+        <button class="btn-secondary" onclick="showRequestHistory('${req.id}', ${jsStr(req.pets.name)})">Ver histórico</button>
         ${req.status === 'pending' ? `
           <button class="btn-primary" onclick="approveRequest('${req.id}')">Aprovar</button>
           <button class="btn-secondary" onclick="rejectRequest('${req.id}')">Rejeitar</button>
@@ -1234,8 +1270,8 @@ async function renderAdminRequests() {
           <button class="btn-primary" onclick="completeAdoption('${req.id}')">Concluir Adoção</button>
         ` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 async function approveRequest(requestId) {
@@ -1707,4 +1743,503 @@ async function confirmVerificationCode() {
   localStorage.removeItem(getTwoFactorStorageKey());
   loadTwoFactorStatus();
   alert('Conta verificada com sucesso! ✔');
+}
+
+// ============================================================================
+// UTILITÁRIOS COMPARTILHADOS
+// ============================================================================
+const STATUS_LABELS = {
+  pending: 'Pendente',
+  approved: 'Aprovada',
+  rejected: 'Rejeitada',
+  visit_scheduled: 'Visita agendada',
+  completed: 'Adoção concluída'
+};
+
+// Texto seguro para usar dentro de onclick="...": evita quebrar com aspas no nome
+function jsStr(text) {
+  return "decodeURIComponent('" + encodeURIComponent(text == null ? '' : String(text)).replace(/'/g, '%27') + "')";
+}
+
+function fmtDateTime(value) {
+  return value ? new Date(value).toLocaleString('pt-BR') : '—';
+}
+
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Registra um evento no log do sistema (o banco só aceita ações da lista permitida)
+async function logClientEvent(action) {
+  try {
+    await sb.rpc('log_client_event', { p_action: action });
+  } catch (e) {
+    // o log nunca deve atrapalhar o uso do site
+  }
+}
+
+// ============================================================================
+// CONTROLE DE HISTÓRICO (linha do tempo de cada solicitação de adoção)
+// ============================================================================
+async function showRequestHistory(requestId, petName) {
+  const modal = document.getElementById('historyModal');
+  const box = document.getElementById('historyContent');
+  box.innerHTML = '<p style="text-align:center; color:#999;">Carregando...</p>';
+  modal.classList.add('active');
+
+  const { data: rows, error } = await sb
+    .from('request_history')
+    .select('status, created_at')
+    .eq('request_id', requestId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    box.innerHTML = `<p style="text-align:center; color:#999;">Não foi possível carregar o histórico: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  const items = (rows || []).map((row, i, all) => `
+    <div style="display:flex; gap:0.75rem; align-items:flex-start;">
+      <div style="display:flex; flex-direction:column; align-items:center;">
+        <div style="width:16px; height:16px; border-radius:50%; background:${row.status === 'rejected' ? '#d33' : 'var(--primary-green)'}; margin-top:4px;"></div>
+        ${i < all.length - 1 ? '<div style="width:3px; flex:1; min-height:28px; background:#ccc;"></div>' : ''}
+      </div>
+      <div style="padding-bottom:1rem;">
+        <strong>${escapeHtml(STATUS_LABELS[row.status] || row.status)}</strong>
+        <div style="font-size:0.85rem; color:#777;">${escapeHtml(fmtDateTime(row.created_at))}</div>
+      </div>
+    </div>`).join('');
+
+  box.innerHTML = `
+    <h3 style="margin-bottom:0.25rem;">Histórico da solicitação</h3>
+    <p style="color:#777; margin-bottom:1.25rem;">Pet: <strong>${escapeHtml(petName)}</strong></p>
+    ${items || '<p style="color:#999;">Nenhum registro de histórico para esta solicitação.</p>'}
+    <button class="btn-secondary" style="width:100%; margin-top:0.5rem;" onclick="closeHistoryModal()">Fechar</button>
+  `;
+}
+
+function closeHistoryModal() {
+  document.getElementById('historyModal').classList.remove('active');
+}
+
+// ============================================================================
+// AJUDA E RECLAMAÇÕES
+// ============================================================================
+const COMPLAINT_KINDS = { help: 'Ajuda', complaint: 'Reclamação', suggestion: 'Sugestão' };
+const COMPLAINT_STATUS = { open: 'Aberta', in_progress: 'Em andamento', resolved: 'Resolvida' };
+
+async function loadHelpPage() {
+  const notice = document.getElementById('helpLoginNotice');
+  const form = document.getElementById('helpForm');
+  const title = document.getElementById('myComplaintsTitle');
+  const list = document.getElementById('myComplaintsList');
+
+  if (!currentUser) {
+    notice.style.display = 'block';
+    form.style.display = 'none';
+    title.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  notice.style.display = 'none';
+  form.style.display = 'block';
+  title.style.display = 'block';
+  list.innerHTML = '<p style="color:#999;">Carregando...</p>';
+
+  const { data: rows, error } = await sb
+    .from('complaints')
+    .select('*')
+    .eq('author_id', currentUser.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    list.innerHTML = `<p style="color:#999;">Não foi possível carregar suas mensagens: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  if (!rows || rows.length === 0) {
+    list.innerHTML = '<p style="color:#999;">Você ainda não enviou nenhuma mensagem.</p>';
+    return;
+  }
+
+  list.innerHTML = rows.map(c => `
+    <div style="background: var(--light-bg); padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1rem; border-left: 4px solid ${c.status === 'resolved' ? 'var(--primary-green)' : 'var(--primary-blue)'};">
+      <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+        <strong>${escapeHtml(c.subject)}</strong>
+        <span style="font-size:0.8rem; color:#777;">${escapeHtml(COMPLAINT_KINDS[c.kind] || c.kind)} · ${escapeHtml(COMPLAINT_STATUS[c.status] || c.status)} · ${escapeHtml(fmtDateTime(c.created_at))}</span>
+      </div>
+      <p style="margin:0.5rem 0; white-space:pre-wrap;">${escapeHtml(c.message)}</p>
+      ${c.response ? `<div style="background:#fff; padding:0.75rem; border-radius:8px;"><strong>Resposta da equipe:</strong><p style="white-space:pre-wrap; margin-top:0.25rem;">${escapeHtml(c.response)}</p></div>` : ''}
+    </div>`).join('');
+}
+
+async function submitComplaint() {
+  if (!currentUser) {
+    alert('Faça login para enviar uma mensagem.');
+    openAuthModal();
+    return;
+  }
+
+  const kind = document.getElementById('complaintKind').value;
+  const subject = document.getElementById('complaintSubject').value.trim();
+  const message = document.getElementById('complaintMessage').value.trim();
+
+  if (!subject || !message) {
+    alert('Preencha o assunto e a mensagem.');
+    return;
+  }
+
+  const { error } = await sb.from('complaints').insert([{
+    author_id: currentUser.id,
+    author_name: currentUser.name,
+    author_email: currentUser.email,
+    kind,
+    subject: subject.slice(0, 150),
+    message: message.slice(0, 3000)
+  }]);
+
+  if (error) {
+    alert('Não foi possível enviar a mensagem: ' + error.message);
+    return;
+  }
+
+  document.getElementById('complaintSubject').value = '';
+  document.getElementById('complaintMessage').value = '';
+  alert('Mensagem enviada! A equipe responde por aqui mesmo.');
+  loadHelpPage();
+}
+
+// ============================================================================
+// PAINEL ADM / SUPERVISOR: abas (usuários, reclamações, logs)
+// ============================================================================
+function switchStaffTab(tab) {
+  const isAdmin = currentUser && currentUser.user_type === 'admin';
+  if (tab === 'logs' && !isAdmin) tab = 'users';
+
+  document.querySelectorAll('#page-admin-panel .admin-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#page-admin-panel .admin-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`staff-${tab}`).classList.add('active');
+  document.getElementById(`staffTabBtn-${tab}`).classList.add('active');
+
+  if (tab === 'users') renderAdminUsersList();
+  else if (tab === 'complaints') renderStaffComplaints();
+  else if (tab === 'logs') renderSystemLogs();
+}
+
+async function renderStaffComplaints() {
+  const container = document.getElementById('staffComplaintsList');
+  const filter = document.getElementById('staffComplaintFilter').value;
+  container.innerHTML = '<p style="text-align:center; color:#999;">Carregando...</p>';
+
+  let query = sb.from('complaints').select('*').order('created_at', { ascending: false }).limit(100);
+  if (filter) query = query.eq('status', filter);
+  const { data: rows, error } = await query;
+
+  if (error) {
+    container.innerHTML = `<p style="text-align:center; color:#999;">Erro ao carregar mensagens: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+
+  if (!rows || rows.length === 0) {
+    container.innerHTML = '<p style="text-align:center; color:#999;">Nenhuma mensagem encontrada.</p>';
+    return;
+  }
+
+  const statusColor = { open: '#d9822b', in_progress: 'var(--primary-blue)', resolved: 'var(--primary-green)' };
+
+  container.innerHTML = rows.map(c => `
+    <div style="background: var(--light-bg); padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <strong>${escapeHtml(c.subject)}</strong>
+        <span style="background:${statusColor[c.status] || '#999'}; color:#fff; font-size:0.7rem; padding:2px 10px; border-radius:999px;">${escapeHtml(COMPLAINT_STATUS[c.status] || c.status)}</span>
+      </div>
+      <p style="font-size:0.85rem; color:#666; margin:0.25rem 0;">${escapeHtml(COMPLAINT_KINDS[c.kind] || c.kind)} · ${escapeHtml(c.author_name || 'Conta excluída')}${c.author_email ? ' · ' + escapeHtml(c.author_email) : ''} · ${escapeHtml(fmtDateTime(c.created_at))}</p>
+      <p style="margin:0.5rem 0; white-space:pre-wrap;">${escapeHtml(c.message)}</p>
+      ${c.response ? `<div style="background:#fff; padding:0.75rem; border-radius:8px; margin-bottom:0.5rem;"><strong>Resposta enviada:</strong><p style="white-space:pre-wrap; margin-top:0.25rem;">${escapeHtml(c.response)}</p></div>` : ''}
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <button class="btn-primary" onclick="respondComplaint('${c.id}')">${c.response ? 'Editar resposta' : 'Responder'}</button>
+        ${c.status === 'open' ? `<button class="btn-secondary" onclick="setComplaintStatus('${c.id}', 'in_progress')">Marcar em andamento</button>` : ''}
+        ${c.status === 'resolved' ? `<button class="btn-secondary" onclick="setComplaintStatus('${c.id}', 'open')">Reabrir</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+async function respondComplaint(id) {
+  const text = prompt('Digite a resposta para o usuário:');
+  if (!text || !text.trim()) return;
+
+  const { error } = await sb.from('complaints').update({
+    response: text.trim().slice(0, 3000),
+    status: 'resolved',
+    responded_by: currentUser.id,
+    responded_at: new Date().toISOString()
+  }).eq('id', id);
+
+  if (error) { alert('Não foi possível enviar a resposta: ' + error.message); return; }
+  renderStaffComplaints();
+}
+
+async function setComplaintStatus(id, status) {
+  const { error } = await sb.from('complaints').update({ status }).eq('id', id);
+  if (error) { alert('Não foi possível atualizar: ' + error.message); return; }
+  renderStaffComplaints();
+}
+
+// ============================================================================
+// LOG DE SISTEMA (somente Administrador)
+// ============================================================================
+const LOG_LABELS = {
+  login: 'Login',
+  logout: 'Logout',
+  cadastro: 'Cadastro de conta',
+  solicitacao_pending: 'Solicitação de adoção criada',
+  solicitacao_approved: 'Solicitação aprovada',
+  solicitacao_rejected: 'Solicitação rejeitada',
+  solicitacao_visit_scheduled: 'Visita agendada',
+  solicitacao_completed: 'Adoção concluída',
+  conta_verificada: 'Conta verificada',
+  verificacao_removida: 'Verificação removida',
+  conta_bloqueada: 'Conta bloqueada',
+  conta_desbloqueada: 'Conta desbloqueada',
+  papel_alterado: 'Papel alterado',
+  conta_excluida: 'Conta excluída',
+  pet_cadastrado: 'Pet cadastrado',
+  pet_excluido: 'Pet excluído',
+  mensagem_enviada: 'Mensagem enviada (ajuda)',
+  mensagem_respondida: 'Mensagem respondida',
+  '2fa_concluida': 'Verificação em duas etapas concluída',
+  exportou_dados: 'Baixou os próprios dados (LGPD)',
+  aceitou_lgpd: 'Aceitou a Política de Privacidade'
+};
+
+const LOG_GROUPS = {
+  access: ['login', 'logout', 'cadastro'],
+  requests: ['solicitacao_pending', 'solicitacao_approved', 'solicitacao_rejected', 'solicitacao_visit_scheduled', 'solicitacao_completed'],
+  moderation: ['conta_verificada', 'verificacao_removida', 'conta_bloqueada', 'conta_desbloqueada', 'papel_alterado', 'conta_excluida'],
+  pets: ['pet_cadastrado', 'pet_excluido'],
+  messages: ['mensagem_enviada', 'mensagem_respondida'],
+  lgpd: ['aceitou_lgpd', 'exportou_dados', '2fa_concluida']
+};
+
+let lastLogRows = [];
+
+async function renderSystemLogs() {
+  const container = document.getElementById('staffLogsList');
+  if (!currentUser || currentUser.user_type !== 'admin') {
+    container.innerHTML = '<p style="color:#999;">Apenas o Administrador acessa os logs.</p>';
+    return;
+  }
+  container.innerHTML = '<p style="text-align:center; color:#999;">Carregando...</p>';
+
+  const group = document.getElementById('staffLogFilter').value;
+  let query = sb.from('system_logs').select('*').order('created_at', { ascending: false }).limit(300);
+  if (group && LOG_GROUPS[group]) query = query.in('action', LOG_GROUPS[group]);
+  const { data: logs, error } = await query;
+
+  if (error) {
+    container.innerHTML = `<p style="color:#999;">Erro ao carregar os logs: ${escapeHtml(error.message)}. Confira se o SQL de histórico, logs, ajuda e LGPD foi executado no Supabase.</p>`;
+    return;
+  }
+
+  if (!logs || logs.length === 0) {
+    lastLogRows = [];
+    container.innerHTML = '<p style="text-align:center; color:#999;">Nenhum registro encontrado.</p>';
+    return;
+  }
+
+  // Resolve o nome da conta envolvida (quando ela ainda existe)
+  const targetIds = [...new Set(logs.map(l => l.target_id).filter(Boolean))];
+  let nameById = {};
+  if (targetIds.length > 0) {
+    const { data: profiles } = await sb.from('profiles').select('id, name').in('id', targetIds);
+    nameById = Object.fromEntries((profiles || []).map(p => [p.id, p.name]));
+  }
+
+  lastLogRows = logs.map(l => [
+    fmtDateTime(l.created_at),
+    l.actor_name || 'Sistema',
+    l.actor_role === 'sistema' ? 'Sistema' : getRoleLabel(l.actor_role),
+    LOG_LABELS[l.action] || l.action,
+    l.target_id ? (nameById[l.target_id] || 'Conta excluída') : '',
+    l.details || ''
+  ]);
+
+  container.innerHTML = `
+    <table class="log-table">
+      <thead><tr><th>Data e hora</th><th>Quem fez</th><th>Perfil</th><th>Ação</th><th>Conta envolvida</th><th>Detalhes</th></tr></thead>
+      <tbody>${lastLogRows.map(r => `<tr>${r.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>
+    <p style="color:#999; font-size:0.8rem; margin-top:0.5rem;">Mostrando os ${lastLogRows.length} registros mais recentes.</p>`;
+}
+
+function exportLogsCsv() {
+  if (!lastLogRows.length) {
+    alert('Não há registros carregados para baixar.');
+    return;
+  }
+  const header = ['Data e hora', 'Quem fez', 'Perfil', 'Ação', 'Conta envolvida', 'Detalhes'];
+  const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const csv = [header, ...lastLogRows].map(r => r.map(esc).join(';')).join('\n');
+  downloadFile('logs-petmatch.csv', '﻿' + csv, 'text/csv;charset=utf-8');
+}
+
+// ============================================================================
+// LGPD (consentimento, política, baixar dados e excluir conta)
+// ============================================================================
+const LGPD_NOTICE_KEY = 'petmatch_privacy_notice_v1';
+
+function openPrivacy() {
+  closeAuthModal();
+  showPage('privacy');
+}
+
+function renderLgpdBanner() {
+  const banner = document.getElementById('lgpdBanner');
+  if (!banner) return;
+  const text = document.getElementById('lgpdBannerText');
+  const btn = document.getElementById('lgpdBannerBtn');
+
+  if (currentUser && !currentUser.lgpd_consent_at) {
+    text.textContent = 'Para continuar usando o PetMatch, leia a Política de Privacidade (LGPD) e confirme o seu consentimento.';
+    btn.textContent = 'Aceitar';
+    banner.style.display = 'flex';
+    return;
+  }
+
+  let seen = false;
+  try { seen = localStorage.getItem(LGPD_NOTICE_KEY) === '1'; } catch (e) { /* sem storage */ }
+  if (!currentUser && !seen) {
+    text.textContent = 'O PetMatch guarda no seu navegador apenas o necessário para o funcionamento do site (login e verificação em duas etapas). Não usamos cookies de rastreamento.';
+    btn.textContent = 'Entendi';
+    banner.style.display = 'flex';
+    return;
+  }
+
+  banner.style.display = 'none';
+}
+
+async function handleLgpdBanner() {
+  if (currentUser && !currentUser.lgpd_consent_at) {
+    await acceptLgpd();
+    return;
+  }
+  try { localStorage.setItem(LGPD_NOTICE_KEY, '1'); } catch (e) { /* sem storage */ }
+  document.getElementById('lgpdBanner').style.display = 'none';
+}
+
+async function acceptLgpd() {
+  if (!currentUser) return;
+  const now = new Date().toISOString();
+  const { error } = await sb.from('profiles')
+    .update({ lgpd_consent_at: now, lgpd_consent_version: '1.0' })
+    .eq('id', currentUser.id);
+  if (error) { alert('Não foi possível registrar o consentimento: ' + error.message); return; }
+  currentUser.lgpd_consent_at = now;
+  logClientEvent('aceitou_lgpd');
+  renderLgpdBanner();
+  if (currentPage === 'lgpd') loadLgpdPage();
+}
+
+function loadLgpdPage() {
+  const box = document.getElementById('lgpdStatus');
+  if (!currentUser) return;
+  if (currentUser.lgpd_consent_at) {
+    box.innerHTML = `<p><strong>Consentimento:</strong> ✔ registrado em ${escapeHtml(fmtDateTime(currentUser.lgpd_consent_at))} (política versão ${escapeHtml(currentUser.lgpd_consent_version || '1.0')}).</p>`;
+  } else {
+    box.innerHTML = `
+      <p><strong>Consentimento:</strong> ainda não registrado.</p>
+      <button class="btn-primary" style="margin-top:0.75rem;" onclick="acceptLgpd()">Aceitar a Política de Privacidade</button>`;
+  }
+}
+
+async function exportMyData() {
+  if (!currentUser) return;
+  const uid = currentUser.id;
+
+  const fetchRows = async (table, column) => {
+    const { data } = await sb.from(table).select('*').eq(column, uid);
+    return data || [];
+  };
+
+  const profileResult = await sb.from('profiles').select('*').eq('id', uid).single();
+  const [favorites, requests, notifications, complaints, pets] = await Promise.all([
+    fetchRows('favorites', 'adopter_id'),
+    fetchRows('adoption_requests', 'adopter_id'),
+    fetchRows('notifications', 'adopter_id'),
+    fetchRows('complaints', 'author_id'),
+    currentUser.user_type === 'ong' ? fetchRows('pets', 'ong_id') : Promise.resolve([])
+  ]);
+
+  const payload = {
+    gerado_em: new Date().toISOString(),
+    observacao: 'Cópia dos dados pessoais guardados pelo PetMatch (LGPD, art. 18).',
+    perfil: profileResult.data || null,
+    favoritos: favorites,
+    solicitacoes_de_adocao: requests,
+    notificacoes: notifications,
+    mensagens_de_ajuda: complaints,
+    pets_cadastrados: pets
+  };
+
+  downloadFile('meus-dados-petmatch.json', JSON.stringify(payload, null, 2), 'application/json');
+  logClientEvent('exportou_dados');
+}
+
+async function deleteMyAccount() {
+  if (!currentUser) return;
+
+  if (['admin', 'supervisor'].includes(currentUser.user_type)) {
+    alert('Contas de Administrador e Supervisor só podem ser removidas pelo Administrador do sistema.');
+    return;
+  }
+
+  const ongWarning = currentUser.user_type === 'ong'
+    ? '\n\nAtenção: os pets e as solicitações da sua ONG também serão apagados.'
+    : '';
+  if (!confirm('Excluir a sua conta? Seu login, seu perfil e os dados ligados a ele serão apagados e isso não pode ser desfeito.' + ongWarning)) return;
+
+  const typed = prompt('Para confirmar, digite EXCLUIR:');
+  if (!typed || typed.trim().toUpperCase() !== 'EXCLUIR') {
+    alert('Exclusão cancelada.');
+    return;
+  }
+
+  const { error } = await sb.rpc('delete_my_account');
+  if (error) {
+    alert('Não foi possível excluir a conta: ' + error.message);
+    return;
+  }
+
+  try { await sb.auth.signOut(); } catch (e) { /* o login já foi removido */ }
+  currentUser = null;
+  updateHeader();
+  showPage('home');
+  document.getElementById('profileMenu').style.display = 'none';
+  alert('Sua conta e os seus dados foram excluídos.');
+}
+
+
+// ===== PLANOS / ASSINATURAS (simulação) =====
+function setBilling(mode) {
+  const annual = mode === 'annual';
+  document.getElementById('billMonthly').classList.toggle('active', !annual);
+  document.getElementById('billAnnual').classList.toggle('active', annual);
+  document.querySelectorAll('#page-plans .plan-amount[data-monthly]').forEach(el => {
+    el.textContent = annual ? el.dataset.annual : el.dataset.monthly;
+    const per = el.parentElement.querySelector('.plan-period');
+    if (per) per.textContent = annual ? '/ano' : '/mês';
+  });
+}
+
+function subscribePlan(name) {
+  alert('Plano ' + name + ': o pagamento ainda não está ativo. Esta é uma simulação do projeto (TCC).');
 }
