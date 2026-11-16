@@ -71,7 +71,11 @@ async function loadStats() {
 // AUTENTICAÇÃO (Supabase Auth + tabela profiles)
 // ============================================================================
 
+// Link de recuperação de senha (o Supabase coloca type=recovery no endereço)
+let recoveryPending = /type=recovery/.test(location.hash || '');
+
 async function restoreSession() {
+  if (recoveryPending) return;
   const { data, error } = await sb.auth.getSession();
   if (error || !data.session) return;
 
@@ -1570,7 +1574,7 @@ const SUPPORT_KNOWLEDGE_BASE = [
   {
     keywords: ['senha', 'esqueci', 'recuperar acesso', 'não consigo entrar'],
     question: 'Esqueci minha senha, e agora?',
-    answer: 'No momento o site ainda não tem recuperação automática de senha. Entre em contato diretamente com a equipe do PetMatch para receber ajuda com o acesso à sua conta.'
+    answer: 'Na tela de login, clique em "Esqueci minha senha", digite o e-mail da conta e enviaremos um link para criar uma nova senha. Se o e-mail não chegar, olhe a caixa de spam. Se você não lembra qual e-mail usou ou não tem mais acesso a ele, fale com a equipe pelo e-mail contato@petmatch.com informando seu nome e cidade.'
   },
   {
     keywords: ['gratuito', 'grátis', 'custa', 'preço', 'pagar'],
@@ -2698,32 +2702,178 @@ function setShopCategory(cat) {
   renderShop();
 }
 
+function shopUnitPrice(p) {
+  return hasPlan(currentUser, 'plus') ? p.price * (1 - PLUS_SHOP_DISCOUNT / 100) : p.price;
+}
+
 function renderShop() {
   const grid = document.getElementById('shopGrid');
-  const list = productsCache.filter(p => !shopCategory || p.category === shopCategory);
+  const q = (document.getElementById('shopSearch')?.value || '').trim().toLowerCase();
+  const sort = document.getElementById('shopSort')?.value || 'new';
+  let list = productsCache.filter(p => (!shopCategory || p.category === shopCategory) && (!q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q)));
+  if (sort === 'low') list = list.slice().sort((a, b) => a.price - b.price);
+  else if (sort === 'high') list = list.slice().sort((a, b) => b.price - a.price);
+  else if (sort === 'az') list = list.slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  updateCartBadge();
   if (!list.length) {
-    grid.innerHTML = '<p style="text-align:center; color:#999; grid-column:1/-1;">Nenhum produto nessa categoria.</p>';
+    grid.innerHTML = '<p style="text-align:center; color:#999; grid-column:1/-1;">Nenhum produto encontrado.</p>';
     return;
   }
-  const names = window.__partnerNames || {};
   grid.innerHTML = list.map(p => {
     const img = safeImage(p.image_url);
+    const plus = hasPlan(currentUser, 'plus');
     return `<div class="partner-card product-card">
-      ${img ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(p.name)}" class="product-img">` : `<div class="product-img product-noimg">${(PRODUCT_CATEGORIES[p.category] || '🎁').split(' ')[0]}</div>`}
-      <span class="partner-cat">${PRODUCT_CATEGORIES[p.category] || PRODUCT_CATEGORIES.outro}</span>
-      <h3>${escapeHtml(p.name)}</h3>
-      ${p.description ? `<p class="partner-desc">${escapeHtml(p.description)}</p>` : ''}
-      ${p.partner_id && names[p.partner_id] ? `<p>🏪 ${escapeHtml(names[p.partner_id])}</p>` : ''}
-      ${hasPlan(currentUser, 'plus')
-        ? `<div class="product-price"><s class="product-old">${formatPrice(p.price)}</s> ${formatPrice(p.price * (1 - PLUS_SHOP_DISCOUNT / 100))}<small class="partner-plus"> Plus -${PLUS_SHOP_DISCOUNT}%</small></div>`
+      <div class="product-click" onclick="openProduct('${p.id}')">
+        ${img ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(p.name)}" class="product-img" loading="lazy">` : `<div class="product-img product-noimg">${(PRODUCT_CATEGORIES[p.category] || '🎁').split(' ')[0]}</div>`}
+        <h3>${escapeHtml(p.name)}</h3>
+      </div>
+      ${plus
+        ? `<div class="product-price"><s class="product-old">${formatPrice(p.price)}</s> ${formatPrice(shopUnitPrice(p))}<small class="partner-plus"> Plus -${PLUS_SHOP_DISCOUNT}%</small></div>`
         : `<div class="product-price">${formatPrice(p.price)}</div><small class="partner-desc">Com Adotador Plus: ${formatPrice(p.price * (1 - PLUS_SHOP_DISCOUNT / 100))}</small>`}
-      <button type="button" class="btn-primary" onclick="productInterest('${escapeHtml(p.name).replace(/'/g, '&#39;')}')">Tenho interesse</button>
+      <button type="button" class="btn-primary" onclick="openProduct('${p.id}')">Ver produto</button>
     </div>`;
   }).join('');
 }
 
-function productInterest(name) {
-  alert('Você demonstrou interesse em "' + name + '". A compra ainda não está ativa: esta é uma vitrine do projeto (TCC).');
+// ----- Carrinho e compra simulada -----
+const SIZED_CATEGORIES = ['roupa', 'coleira'];
+const SIZE_GUIDE = [['P', 'até 5 kg'], ['M', 'de 5 a 12 kg'], ['G', 'de 12 a 25 kg'], ['GG', 'acima de 25 kg']];
+let cart = [];
+try { cart = JSON.parse(localStorage.getItem('petmatch_cart') || '[]'); if (!Array.isArray(cart)) cart = []; } catch (e) { cart = []; }
+
+function saveCart() {
+  try { localStorage.setItem('petmatch_cart', JSON.stringify(cart)); } catch (e) { /* sem armazenamento */ }
+  updateCartBadge();
+}
+function updateCartBadge() {
+  const el = document.getElementById('cartBadge');
+  if (el) el.textContent = cart.reduce((s, i) => s + i.qty, 0);
+}
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2200);
+}
+
+function openProduct(id) {
+  const p = productsCache.find(x => x.id === id);
+  if (!p) return;
+  const img = safeImage(p.image_url);
+  const sized = SIZED_CATEGORIES.includes(p.category);
+  const plus = hasPlan(currentUser, 'plus');
+  openPetToolModal(`
+    <div class="pd">
+      ${img ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(p.name)}" class="pd-img">` : ''}
+      <span class="partner-cat">${PRODUCT_CATEGORIES[p.category] || PRODUCT_CATEGORIES.outro}</span>
+      <h2>${escapeHtml(p.name)}</h2>
+      <div class="product-price" style="font-size:1.5rem;">${plus ? `<s class="product-old">${formatPrice(p.price)}</s> ${formatPrice(shopUnitPrice(p))} <small class="partner-plus">Plus -${PLUS_SHOP_DISCOUNT}%</small>` : formatPrice(p.price)}</div>
+      ${p.description ? `<p>${escapeHtml(p.description)}</p>` : ''}
+      ${sized ? `<h4>Tamanho</h4><div class="size-picker" id="pdSizes">${SIZE_GUIDE.map(([s]) => `<button type="button" class="size-btn" data-size="${s}" onclick="pickSize('${s}')">${s}</button>`).join('')}</div>
+        <details class="size-guide"><summary>Guia de tamanhos</summary>${SIZE_GUIDE.map(([s, w]) => `<div><b>${s}</b> — ${w}</div>`).join('')}<small>Dica: meça o peito do pet e compare com o peso; na dúvida, escolha o tamanho maior.</small></details>` : ''}
+      <h4>Quantidade</h4>
+      <div class="qty"><button type="button" onclick="pdQty(-1)">−</button><span id="pdQty">1</span><button type="button" onclick="pdQty(1)">+</button></div>
+      <div class="pd-actions">
+        <button type="button" class="btn-secondary" onclick="addToCart('${p.id}', false)">Adicionar ao carrinho</button>
+        <button type="button" class="btn-primary" onclick="addToCart('${p.id}', true)">Comprar agora</button>
+      </div>
+    </div>`);
+  window.__pdSize = null;
+}
+function pickSize(s) {
+  window.__pdSize = s;
+  document.querySelectorAll('#pdSizes .size-btn').forEach(b => b.classList.toggle('active', b.dataset.size === s));
+}
+function pdQty(d) {
+  const el = document.getElementById('pdQty');
+  el.textContent = Math.min(20, Math.max(1, parseInt(el.textContent, 10) + d));
+}
+
+function addToCart(id, goCart) {
+  const p = productsCache.find(x => x.id === id);
+  if (!p) return;
+  const sized = SIZED_CATEGORIES.includes(p.category);
+  if (sized && !window.__pdSize) { alert('Escolha o tamanho primeiro.'); return; }
+  const qty = parseInt(document.getElementById('pdQty').textContent, 10) || 1;
+  const size = sized ? window.__pdSize : null;
+  const found = cart.find(i => i.id === id && i.size === size);
+  if (found) found.qty = Math.min(20, found.qty + qty);
+  else cart.push({ id, name: p.name, price: p.price, image: p.image_url || null, size, qty });
+  saveCart();
+  if (goCart) openCart(); else { closePetToolModal(); showToast('Adicionado ao carrinho'); }
+}
+
+function cartTotals() {
+  const plus = hasPlan(currentUser, 'plus');
+  const raw = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const discount = plus ? raw * PLUS_SHOP_DISCOUNT / 100 : 0;
+  const sub = raw - discount;
+  const shipping = !cart.length || sub >= 150 ? 0 : 12.9;
+  return { raw, discount, sub, shipping, total: sub + shipping };
+}
+
+function openCart() {
+  if (!cart.length) {
+    openPetToolModal('<h2>🛒 Seu carrinho</h2><p style="color:#888;">O carrinho está vazio. Escolha produtos na vitrine.</p>');
+    return;
+  }
+  const t = cartTotals();
+  openPetToolModal(`
+    <h2>🛒 Seu carrinho</h2>
+    ${cart.map((i, idx) => `
+      <div class="cart-line">
+        ${safeImage(i.image) ? `<img src="${escapeHtml(safeImage(i.image))}" alt="">` : '<div class="cart-noimg">🎁</div>'}
+        <div class="cart-info"><b>${escapeHtml(i.name)}</b>${i.size ? `<br><small>Tamanho ${escapeHtml(i.size)}</small>` : ''}<br><small>${formatPrice(i.price)} cada</small></div>
+        <div class="qty"><button type="button" onclick="cartQty(${idx}, -1)">−</button><span>${i.qty}</span><button type="button" onclick="cartQty(${idx}, 1)">+</button></div>
+        <button type="button" class="btn-secondary" style="color:#c0392b; padding:2px 10px;" onclick="cartRemove(${idx})">✕</button>
+      </div>`).join('')}
+    <div class="cart-totals">
+      <div><span>Subtotal</span><span>${formatPrice(t.raw)}</span></div>
+      ${t.discount ? `<div class="partner-plus"><span>Desconto Adotador Plus (${PLUS_SHOP_DISCOUNT}%)</span><span>− ${formatPrice(t.discount)}</span></div>` : ''}
+      <div><span>Frete</span><span>${t.shipping ? formatPrice(t.shipping) : 'Grátis'}</span></div>
+      ${!t.shipping ? '' : '<small>Frete grátis em compras a partir de R$ 150,00.</small>'}
+      <div class="cart-total"><span>Total</span><span>${formatPrice(t.total)}</span></div>
+    </div>
+    <h4>Entrega e pagamento</h4>
+    <form onsubmit="checkoutOrder(event)" class="commerce-form">
+      <input type="text" id="coName" placeholder="Nome completo" required maxlength="100" value="${escapeHtml(currentUser?.name || '')}">
+      <input type="text" id="coCep" placeholder="CEP" required inputmode="numeric" maxlength="9" value="${escapeHtml(formatCep(currentUser?.cep || ''))}">
+      <input type="text" id="coAddress" placeholder="Endereço e número" required maxlength="160">
+      <select id="coPay"><option value="pix">Pix</option><option value="card">Cartão de crédito</option><option value="boleto">Boleto</option></select>
+      <button type="submit" class="btn-primary">Finalizar pedido</button>
+    </form>
+    <p class="plans-note">Compra simulada: nenhum pagamento é feito.</p>`);
+}
+
+function cartQty(idx, d) {
+  const i = cart[idx]; if (!i) return;
+  i.qty = Math.min(20, Math.max(1, i.qty + d));
+  saveCart(); openCart();
+}
+function cartRemove(idx) {
+  cart.splice(idx, 1);
+  saveCart(); openCart();
+}
+
+function checkoutOrder(e) {
+  e.preventDefault();
+  const cep = normCep(document.getElementById('coCep').value);
+  if (cep.length !== 8) { alert('O CEP deve ter 8 números.'); return; }
+  const t = cartTotals();
+  const pay = { pix: 'Pix', card: 'Cartão de crédito', boleto: 'Boleto' }[document.getElementById('coPay').value];
+  const order = 'PM' + Date.now().toString(36).toUpperCase().slice(-6);
+  const items = cart.reduce((s, i) => s + i.qty, 0);
+  cart = []; saveCart();
+  openPetToolModal(`
+    <div style="text-align:center;">
+      <div style="font-size:3rem;">🎉</div>
+      <h2>Pedido simulado realizado!</h2>
+      <p>Número do pedido: <b>${order}</b></p>
+      <p>${items} item(ns) • ${pay} • Total ${formatPrice(t.total)}</p>
+      <p class="plans-note">Esta é uma simulação para o projeto acadêmico: nenhum pagamento foi feito e nenhum produto será enviado.</p>
+      <button type="button" class="btn-primary" onclick="closePetToolModal()">Continuar comprando</button>
+    </div>`);
 }
 
 // ----- Gestão (Administrador e Supervisor) -----
@@ -2793,6 +2943,7 @@ async function saveCommerce(e, kind) {
       longitude: val('cpLng') === '' ? null : parseFloat(val('cpLng')),
       address: val('cpAddress') || null,
       phone: val('cpPhone') || null, description: val('cpDescription') || null,
+      plus_discount: val('cpDiscount') === '' ? null : Math.min(50, Math.max(0, parseInt(val('cpDiscount'), 10) || 0)),
       is_featured: document.getElementById('cpFeatured').checked
     };
   } else if (kind === 'ad') {
@@ -3824,4 +3975,113 @@ async function renderOverview() {
     ${card('Pets', data.pets)}${card('Solicitações', data.requests)}${card('Adoções concluídas', data.completed)}${card('Conteúdos para aprovar', data.pending_content)}</div>
     <h3>Assinaturas ativas por plano</h3><div class="dashboard-stats">${Object.keys(plans).filter(k => k !== 'free').map(k => card(escapeHtml(PLAN_LABELS[k] || k), plans[k])).join('') || '<p style="color:#888;">Nenhuma assinatura ainda.</p>'}</div>
     ${isAdmin ? `<h3>Receita das assinaturas ativas</h3><p class="stat-number">${formatPrice(data.revenue || 0)}</p><small style="color:#888;">Pagamento simulado nesta versão: o valor mostra o que seria cobrado.</small>` : ''}`;
+}
+
+
+// ============================================================================
+// RECUPERAÇÃO DE SENHA
+// ============================================================================
+let recoveryCooldown = false;
+
+function openForgotPassword() {
+  const typed = document.getElementById('loginEmail')?.value.trim() || '';
+  closeAuthModal();
+  openPetToolModal(`
+    <h2>Recuperar senha</h2>
+    <p>Digite o e-mail da sua conta. Enviaremos um link para você criar uma nova senha.</p>
+    <form onsubmit="sendRecovery(event)">
+      <div class="form-group"><label>Email</label><input type="email" id="recEmail" placeholder="seu@email.com" required value="${escapeHtml(typed)}"></div>
+      <button class="btn-primary" id="recBtn" type="submit" style="width:100%;">Enviar link</button>
+    </form>
+    <p class="plans-note">Não lembra o e-mail? Fale com a equipe: contato@petmatch.com (informe nome e cidade).</p>`);
+}
+
+async function sendRecovery(e) {
+  e.preventDefault();
+  if (recoveryCooldown) return;
+  const email = document.getElementById('recEmail').value.trim();
+  if (!isValidEmail(email)) { alert('Digite um e-mail válido.'); return; }
+  recoveryCooldown = true;
+  const btn = document.getElementById('recBtn');
+  btn.disabled = true;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  setTimeout(() => { recoveryCooldown = false; }, 60000);
+  if (error && /rate|limit|seconds/i.test(error.message || '')) {
+    alert('Muitas tentativas. Aguarde alguns minutos e tente de novo.');
+    btn.disabled = false;
+    recoveryCooldown = false;
+    return;
+  }
+  // mesma resposta exista ou não a conta, para não revelar quem está cadastrado
+  openPetToolModal(`<h2>Verifique seu e-mail</h2>
+    <p>Se existir uma conta com <b>${escapeHtml(email)}</b>, enviamos um link para criar uma nova senha. Ele vale por pouco tempo.</p>
+    <p class="plans-note">Não chegou? Olhe o spam e espere alguns minutos antes de tentar de novo.</p>
+    <button class="btn-primary" type="button" onclick="closePetToolModal()">Entendi</button>`);
+}
+
+function openNewPassword() {
+  openPetToolModal(`
+    <h2>Criar nova senha</h2>
+    <form onsubmit="saveNewPassword(event)">
+      <div class="form-group"><label>Nova senha</label><input type="password" id="newPass1" minlength="6" required placeholder="Mínimo 6 caracteres"></div>
+      <div class="form-group"><label>Repita a nova senha</label><input type="password" id="newPass2" minlength="6" required></div>
+      <button class="btn-primary" type="submit" style="width:100%;">Salvar nova senha</button>
+    </form>`);
+}
+
+async function saveNewPassword(e) {
+  e.preventDefault();
+  const p1 = document.getElementById('newPass1').value, p2 = document.getElementById('newPass2').value;
+  if (p1.length < 6) { alert('A senha precisa ter pelo menos 6 caracteres.'); return; }
+  if (p1 !== p2) { alert('As senhas não são iguais.'); return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) { alert('Não foi possível trocar a senha: ' + error.message + '\nPeça um novo link em "Esqueci minha senha".'); return; }
+  recoveryPending = false;
+  await sb.auth.signOut();
+  currentUser = null;
+  updateHeader();
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (err) { /* ignora */ }
+  closePetToolModal();
+  alert('Senha alterada! Entre com a nova senha.');
+  openAuthModal();
+}
+
+// O link do e-mail traz o usuário de volta ao site: abre a tela da nova senha
+document.addEventListener('DOMContentLoaded', () => {
+  if (recoveryPending) setTimeout(openNewPassword, 400);
+  if (sb.auth.onAuthStateChange) {
+    sb.auth.onAuthStateChange(event => {
+      if (event === 'PASSWORD_RECOVERY') { recoveryPending = true; setTimeout(openNewPassword, 200); }
+    });
+  }
+});
+
+
+// ----- Alterar senha (usuário logado) -----
+function openChangePassword() {
+  if (!currentUser) { openAuthModal(); return; }
+  document.getElementById('profileMenu').style.display = 'none';
+  openPetToolModal(`
+    <h2>Alterar senha</h2>
+    <form onsubmit="saveChangedPassword(event)">
+      <div class="form-group"><label>Senha atual</label><input type="password" id="oldPass" required autocomplete="current-password"></div>
+      <div class="form-group"><label>Nova senha</label><input type="password" id="chgPass1" minlength="6" required placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+      <div class="form-group"><label>Repita a nova senha</label><input type="password" id="chgPass2" minlength="6" required autocomplete="new-password"></div>
+      <button class="btn-primary" type="submit" style="width:100%;">Salvar nova senha</button>
+    </form>`);
+}
+
+async function saveChangedPassword(e) {
+  e.preventDefault();
+  const oldPass = document.getElementById('oldPass').value;
+  const p1 = document.getElementById('chgPass1').value, p2 = document.getElementById('chgPass2').value;
+  if (p1.length < 6) { alert('A nova senha precisa ter pelo menos 6 caracteres.'); return; }
+  if (p1 !== p2) { alert('As senhas novas não são iguais.'); return; }
+  if (p1 === oldPass) { alert('A nova senha precisa ser diferente da atual.'); return; }
+  const check = await sb.auth.signInWithPassword({ email: currentUser.email, password: oldPass });
+  if (check.error) { alert('A senha atual está incorreta.'); return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) { alert('Não foi possível trocar a senha: ' + error.message); return; }
+  closePetToolModal();
+  alert('Senha alterada com sucesso!');
 }
