@@ -54,6 +54,7 @@
       <a href="#" id="myPlanLink" onclick="showPage('my-plan')" style="display:none;">💳 Meu Plano</a>
       <a href="#" id="orgPanelLink" onclick="showPage('org-panel')" style="display:none;">Meu Painel</a>
       <a href="#" onclick="showPage('two-factor')">🔒 Verificação em Duas Etapas</a>
+      <a href="#" onclick="openChangePassword(); return false;">🔑 Alterar senha</a>
       <a href="#" onclick="showPage('lgpd')">🛡️ Meus Dados (LGPD)</a>
       <a href="#" id="ongAdminLink" onclick="showPage('ong-admin')" style="display:none;">Painel ONG</a>
       <a href="#" id="adminPanelLink" onclick="showPage('admin-panel')" style="display:none;">Painel ADM</a>
@@ -530,6 +531,7 @@
               <input type="text" id="cpAddress" placeholder="Endereço">
               <input type="text" id="cpPhone" placeholder="Telefone">
               <input type="text" id="cpDescription" placeholder="Descrição curta">
+              <input type="number" id="cpDiscount" placeholder="Desconto para Adotador Plus (%)" min="0" max="50">
               <label class="commerce-check"><input type="checkbox" id="cpFeatured"> Plano destaque (aparece primeiro)</label>
               <button class="btn-primary" type="submit">Adicionar parceiro</button>
             </form>
@@ -627,6 +629,7 @@
         <div class="partners-container">
           <h2>Parceiros perto de você</h2>
           <p class="plans-lead">Pet shops, clínicas e serviços para quem adota. Veja os que ficam na sua cidade e perto do seu CEP.</p>
+          <p class="plans-note" style="margin-top:-0.5rem;">Os estabelecimentos listados são lojas reais, incluídas como referência. Empresas parceiras oficiais criam uma conta de Empresa e publicam os próprios dados.</p>
           <section class="ads-strip" aria-label="Anúncios e campanhas"></section>
           <div class="partners-filters">
             <input type="text" id="partnerCity" placeholder="Cidade" oninput="renderPartners()">
@@ -656,6 +659,16 @@
         <div class="partners-container">
           <h2>Lojinha PetMatch</h2>
           <p class="plans-lead">Tudo para o seu novo amigo: caminhas, roupinhas, coleiras e brinquedos.</p>
+          <div class="shop-bar">
+            <input type="search" id="shopSearch" placeholder="🔍 Buscar produtos" oninput="renderShop()">
+            <select id="shopSort" onchange="renderShop()">
+              <option value="new">Mais recentes</option>
+              <option value="low">Menor preço</option>
+              <option value="high">Maior preço</option>
+              <option value="az">Nome (A-Z)</option>
+            </select>
+            <button type="button" class="btn-primary shop-cart-btn" onclick="openCart()">🛒 Carrinho (<span id="cartBadge">0</span>)</button>
+          </div>
           <div class="shop-cats" id="shopCats">
             <button type="button" class="active" data-cat="" onclick="setShopCategory('')">Tudo</button>
             <button type="button" data-cat="caminha" onclick="setShopCategory('caminha')">🛏️ Caminhas</button>
@@ -664,7 +677,7 @@
             <button type="button" data-cat="brinquedo" onclick="setShopCategory('brinquedo')">🎾 Brinquedos</button>
           </div>
           <div id="shopGrid" class="partners-grid"></div>
-          <p class="plans-note">Vitrine do projeto acadêmico: a compra ainda não está ativa, o botão "Tenho interesse" é uma simulação.</p>
+          <p class="plans-note">Compra simulada (projeto acadêmico): você monta o carrinho e finaliza o pedido, mas nenhum pagamento é feito.</p>
         </div>
       </div>
 
@@ -1189,6 +1202,7 @@
             <input type="password" id="loginPassword" placeholder="Sua senha" required>
           </div>
           <button class="btn-primary" onclick="handleLogin()">Entrar</button>
+          <p style="text-align:center; margin:0.8rem 0 0;"><a href="#" onclick="openForgotPassword(); return false;">Esqueci minha senha</a></p>
           <button class="btn-secondary" style="width:100%; margin-top:0.5rem;" onclick="backToUserType()">Voltar</button>
         </div>
 
