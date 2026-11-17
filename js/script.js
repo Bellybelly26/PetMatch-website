@@ -388,8 +388,7 @@ function updateHeader() {
     adminPanelLink.textContent = currentUser.user_type === 'admin' ? 'Painel ADM' : 'Painel do Supervisor';
     const roleLabel = document.getElementById('profileRoleLabel');
     if (roleLabel) {
-      const plan = planOf(currentUser);
-      roleLabel.textContent = '🏷️ ' + getRoleLabel(currentUser.user_type) + (plan !== 'free' ? ' · ⭐ ' + PLAN_LABELS[plan] : '');
+      roleLabel.textContent = '🏷️ ' + getRoleLabel(currentUser.user_type);
     }
     const role = currentUser.user_type;
     const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? 'block' : 'none'; };
@@ -551,8 +550,6 @@ function showPage(page) {
     const logsBtn = document.getElementById('staffTabBtn-logs');
     if (logsBtn) logsBtn.style.display = currentUser.user_type === 'admin' ? '' : 'none';
     switchStaffTab('users');
-  } else if (page === 'plans') {
-    markCurrentPlan();
   } else if (page === 'org-panel') {
     if (!currentUser || !['prefeitura', 'empresa'].includes(currentUser.user_type)) {
       alert('Este painel é para Prefeituras e Empresas.');
@@ -560,15 +557,6 @@ function showPage(page) {
       return;
     }
     loadOrgPanel();
-  } else if (page === 'events') {
-    loadEventsPage();
-  } else if (page === 'my-pets') {
-    if (!currentUser || currentUser.user_type !== 'adopter') {
-      alert('Meus Pets é para adotadores.');
-      showPage('home');
-      return;
-    }
-    loadMyPetsPage();
   } else if (page === 'compat') {
     if (!currentUser || currentUser.user_type !== 'adopter') {
       alert('Faça login como adotador para ver a compatibilidade.');
@@ -576,13 +564,6 @@ function showPage(page) {
       return;
     }
     loadCompatForm();
-  } else if (page === 'my-plan') {
-    if (!currentUser) {
-      alert('Faça login para ver o seu plano.');
-      showPage('plans');
-      return;
-    }
-    loadMyPlanPage();
   } else if (page === 'help') {
     loadHelpPage();
   } else if (page === 'lgpd') {
@@ -690,11 +671,11 @@ async function renderPets() {
   // Busca o nome das ONGs separadamente (evita ambiguidade de relação no Supabase)
   const ongIds = [...new Set(allPets.map(p => p.ong_id).filter(Boolean))];
   if (ongIds.length > 0) {
-    const { data: ongs } = await sb.from('profiles').select('id, name, plan, plan_expires_at, pix_key, pix_name').in('id', ongIds);
+    const { data: ongs } = await sb.from('profiles').select('id, name').in('id', ongIds);
     const ongById = Object.fromEntries((ongs || []).map(o => [o.id, o]));
     allPets = allPets.map(pet => {
       const ong = ongById[pet.ong_id];
-      return { ...pet, ongName: ong ? ong.name : 'ONG não identificada', ongPlan: planOf(ong), ongPix: ong ? ong.pix_key : null, ongPixName: ong ? ong.pix_name : null };
+      return { ...pet, ongName: ong ? ong.name : 'ONG não identificada' };
     });
   }
 
@@ -730,20 +711,13 @@ function applyPetFilters() {
   if (cepFilter) pets = pets.filter(p => (p.cep || '').startsWith(cepFilter));
   if (favoritesOnly) pets = pets.filter(p => myFavoritePetIds.includes(p.id));
 
-  // Pets cadastrados nas últimas 24 horas aparecem primeiro para o Adotador Plus
-  if (!canSeeNewPets()) pets = pets.filter(p => !isNewPet(p));
-
-  // ONG Premium: pets em destaque no topo; depois, os mais compatíveis (se o adotador pedir)
-  const wantCompat = document.getElementById('filterCompat')?.checked;
-  pets = pets.map((p, i) => ({ p, i })).sort((a, b) => {
-    const fa = a.p.ongPlan === 'premium' ? 1 : 0, fb = b.p.ongPlan === 'premium' ? 1 : 0;
-    if (wantCompat) {
+  // Se o adotador pediu, mostra primeiro os mais compatíveis
+  if (document.getElementById('filterCompat')?.checked) {
+    pets = pets.map((p, i) => ({ p, i })).sort((a, b) => {
       const ca = petCompat(a.p), cb = petCompat(b.p);
-      const d = (cb ? cb.score : -1) - (ca ? ca.score : -1);
-      if (d) return d;
-    }
-    return (fb - fa) || (a.i - b.i);
-  }).map(x => x.p);
+      return ((cb ? cb.score : -1) - (ca ? ca.score : -1)) || (a.i - b.i);
+    }).map(x => x.p);
+  }
   const compatGroup = document.getElementById('filterCompatGroup');
   if (compatGroup) compatGroup.style.display = hasMatchPrefs() ? '' : 'none';
 
@@ -761,8 +735,6 @@ function buildPetCard(pet) {
   card.className = 'pet-card';
   const compat = petCompat(pet);
   const badges = [
-    pet.ongPlan === 'premium' ? '<span class="pet-badge pet-badge-gold">⭐ Destaque</span>' : '',
-    isNewPet(pet) ? '<span class="pet-badge pet-badge-new">🆕 Novo</span>' : '',
     compat ? `<span class="pet-badge pet-badge-compat">💚 ${compat.score}% compatível</span>` : ''
   ].join('');
   card.innerHTML = `
@@ -773,7 +745,7 @@ function buildPetCard(pet) {
       <div class="pet-details">${escapeHtml(pet.breed)}</div>
       <div class="pet-details">${escapeHtml(pet.age)} anos • ${escapeHtml(pet.size)}</div>
       <div class="pet-details">📍 ${escapeHtml(pet.city)}${pet.cep ? ' • CEP ' + escapeHtml(formatCep(pet.cep)) : ''}</div>
-      <div class="pet-details">🏠 ${escapeHtml(pet.ongName || 'ONG não identificada')}${['essencial', 'premium'].includes(pet.ongPlan) ? ' <span class="ong-verified" title="ONG Verificada">✔ ONG Verificada</span>' : ''}</div>
+      <div class="pet-details">🏠 ${escapeHtml(pet.ongName || 'ONG não identificada')}</div>
       <div class="pet-actions">
         <button class="btn-favorite ${isFavorite ? 'active' : ''}" onclick="toggleFavorite('${pet.id}')">
           ${isFavorite ? '❤️' : '🤍'}
@@ -849,8 +821,7 @@ function openPetDetail(petId) {
       <p><strong>Tamanho:</strong> ${pet.size}</p>
       <p><strong>Energia:</strong> ${pet.energy || 'Moderada'}</p>
       <p><strong>Localização:</strong> ${pet.city}, PR${pet.cep ? ' • CEP ' + escapeHtml(formatCep(pet.cep)) : ''}</p>
-      <p><strong>ONG responsável:</strong> ${escapeHtml(pet.ongName || 'Não identificada')}${['essencial', 'premium'].includes(pet.ongPlan) ? ' <span class="ong-verified">✔ ONG Verificada</span>' : ''}</p>
-      ${pet.ongPlan === 'premium' && pet.ongPix ? `<p><strong>Apoiar a ONG (Pix):</strong> <code>${escapeHtml(pet.ongPix)}</code> <button class="btn-secondary" style="padding:2px 10px;" onclick="copyText(${jsStr(pet.ongPix)})">Copiar</button></p>` : ''}
+      <p><strong>ONG responsável:</strong> ${escapeHtml(pet.ongName || 'Não identificada')}</p>
     </div>
     ${compatDetailHtml(pet)}
     <div style="background: var(--light-bg); padding: 1rem; border-radius: 12px; margin: 1rem 0;">
@@ -1166,21 +1137,12 @@ function switchAdminTab(tab) {
     renderAdminVisits();
   } else if (tab === 'pets') {
     renderAdminPets();
-  } else if (tab === 'promo') {
-    renderPromoTab();
-  } else if (tab === 'events') {
-    renderOngEventsTab();
-  } else if (tab === 'reports') {
-    renderReportsTab();
-  } else if (tab === 'team') {
-    renderTeamTab();
   }
 }
 
 async function updateAdminDashboard() {
   if (!currentUser) return;
-  const ongId = ongScopeId();
-  renderOngBanner();
+  const ongId = currentUser.id;
 
   const { count: totalPets } = await sb
     .from('pets')
@@ -1214,7 +1176,7 @@ async function renderAdminPets() {
   const { data: pets, error } = await sb
     .from('pets')
     .select('*')
-    .eq('ong_id', ongScopeId())
+    .eq('ong_id', currentUser.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -1322,7 +1284,7 @@ async function savePetForm(e) {
   }
 
   const petData = {
-    name, type, breed, age, size, energy, city, cep: cep || null, ong_id: ongScopeId(),
+    name, type, breed, age, size, energy, city, cep: cep || null, ong_id: currentUser.id,
     vaccinated, neutered, dewormed,
     health_notes: healthNotes, temperament
   };
@@ -1383,7 +1345,7 @@ async function renderAdminRequests() {
   const { data: requests, error } = await sb
     .from('adoption_requests')
     .select('id, status, adopter_id, pets!inner(name, ong_id)')
-    .eq('pets.ong_id', ongScopeId())
+    .eq('pets.ong_id', currentUser.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -1397,7 +1359,7 @@ async function renderAdminRequests() {
   }
 
   const adopterIds = [...new Set(requests.map(r => r.adopter_id))];
-  const { data: adopters } = await sb.from('profiles').select('id, name, email, phone, city, is_verified, plan, plan_expires_at').in('id', adopterIds);
+  const { data: adopters } = await sb.from('profiles').select('id, name, email, phone, city, is_verified').in('id', adopterIds);
   const adopterById = Object.fromEntries((adopters || []).map(a => [a.id, a]));
 
   list.innerHTML = requests.map(req => {
@@ -1405,7 +1367,7 @@ async function renderAdminRequests() {
     return `
     <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
       <h4>${escapeHtml(req.pets.name)}</h4>
-      <p><strong>Adotador:</strong> ${escapeHtml(a.name || 'Desconhecido')}${a.is_verified ? ' <span style="color: var(--primary-green); font-size:0.8rem;">✔ Verificado</span>' : ''}${hasPlan(a, 'plus') ? ' <span class="plus-seal">⭐ Adotador Plus</span>' : ''}</p>
+      <p><strong>Adotador:</strong> ${escapeHtml(a.name || 'Desconhecido')}${a.is_verified ? ' <span style="color: var(--primary-green); font-size:0.8rem;">✔ Verificado</span>' : ''}</p>
       <p><strong>E-mail:</strong> ${escapeHtml(a.email || '—')}</p>
       <p><strong>Telefone:</strong> ${escapeHtml(a.phone || 'Não informado')}</p>
       <p><strong>Cidade:</strong> ${escapeHtml(a.city || 'Não informada')}</p>
@@ -1413,8 +1375,6 @@ async function renderAdminRequests() {
       <div style="display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;">
         <button class="btn-secondary" onclick="showProfileDetails('${req.adopter_id}')">Ver perfil completo</button>
         <button class="btn-secondary" onclick="showRequestHistory('${req.id}', ${jsStr(req.pets.name)})">Ver histórico</button>
-        ${['essencial', 'premium'].includes(ongPlan()) ? `<button class="btn-secondary" onclick="openRequestChat('${req.id}', ${jsStr(req.pets.name)}, 'ong')">💬 Conversar</button>` : ''}
-        ${ongPlan() === 'premium' ? `<button class="btn-secondary" onclick="openRequestNotes('${req.id}', ${jsStr(req.pets.name)})">📋 Acompanhamento</button>` : ''}
         ${req.status === 'pending' ? `
           <button class="btn-primary" onclick="approveRequest('${req.id}')">Aprovar</button>
           <button class="btn-secondary" onclick="rejectRequest('${req.id}')">Rejeitar</button>
@@ -1457,10 +1417,6 @@ async function scheduleVisit(requestId) {
   }
 
   const visitRow = { request_id: requestId, scheduled_date: scheduledDate.toISOString() };
-  if (ongPlan() === 'premium') {
-    visitRow.kind = confirm('É uma ENTREVISTA? (OK = entrevista, Cancelar = visita)') ? 'interview' : 'visit';
-    visitRow.location = (prompt('Local ou link do encontro (opcional):') || '').trim() || null;
-  }
   const { error } = await sb.from('visits').insert([visitRow]);
 
   if (error) {
@@ -1509,8 +1465,8 @@ async function renderAdminVisits() {
 
   const { data: visits, error } = await sb
     .from('visits')
-    .select('id, scheduled_date, notes, kind, status, location, adoption_requests!inner(pet_id, pets!inner(name, ong_id))')
-    .eq('adoption_requests.pets.ong_id', ongScopeId())
+    .select('id, scheduled_date, notes, adoption_requests!inner(pet_id, pets!inner(name, ong_id))')
+    .eq('adoption_requests.pets.ong_id', currentUser.id)
     .order('scheduled_date', { ascending: true });
 
   if (error) {
@@ -1523,15 +1479,10 @@ async function renderAdminVisits() {
     return;
   }
 
-  const VSTATUS = { scheduled: 'Agendada', done: 'Realizada', cancelled: 'Cancelada' };
-  const premium = ongPlan() === 'premium';
   list.innerHTML = visits.map(v => `
     <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
-      <h4>${escapeHtml(v.adoption_requests.pets.name)} ${v.kind === 'interview' ? '<span class="pet-badge">🎤 Entrevista</span>' : ''}</h4>
+      <h4>${escapeHtml(v.adoption_requests.pets.name)}</h4>
       <p><strong>Data:</strong> ${new Date(v.scheduled_date).toLocaleString()}</p>
-      ${v.location ? `<p><strong>Local:</strong> ${escapeHtml(v.location)}</p>` : ''}
-      ${premium ? `<p><strong>Situação:</strong> ${VSTATUS[v.status] || v.status}</p>
-        ${v.status === 'scheduled' ? `<button class="btn-secondary" onclick="setVisitStatus('${v.id}', 'done')">Marcar como realizada</button> <button class="btn-secondary" onclick="setVisitStatus('${v.id}', 'cancelled')">Cancelar</button>` : ''}` : ''}
       ${v.notes ? `<p><strong>Notas:</strong> ${escapeHtml(v.notes)}</p>` : ''}
     </div>
   `).join('');
@@ -1722,7 +1673,6 @@ async function renderAdminUsersList() {
       </div>
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
         <button class="btn-secondary" onclick="showProfileDetails('${u.id}')">Ver detalhes</button>
-        ${isAdmin && PLAN_FOR_ROLE_ADMIN[u.user_type] ? `<select onchange="adminChangePlan('${u.id}', this.value)" title="Plano">${PLAN_FOR_ROLE_ADMIN[u.user_type].map(p => `<option value="${p}" ${planOf(u) === p ? 'selected' : ''}>${PLAN_LABELS[p] || p}</option>`).join('')}</select>` : (planOf(u) !== 'free' ? `<span class="plus-seal">${escapeHtml(PLAN_LABELS[planOf(u)] || planOf(u))}</span>` : '')}
         <button class="btn-secondary" onclick="adminToggleVerified('${u.id}', ${!u.is_verified})">${u.is_verified ? 'Remover verificação' : 'Verificar'}</button>
         <button class="btn-secondary" onclick="adminToggleBlocked('${u.id}', ${!u.is_blocked})">${u.is_blocked ? 'Desbloquear' : 'Bloquear'}</button>
         ${isAdmin ? (isSup
@@ -2105,7 +2055,7 @@ async function renderStaffComplaints() {
   const filter = document.getElementById('staffComplaintFilter').value;
   container.innerHTML = '<p style="text-align:center; color:#999;">Carregando...</p>';
 
-  let query = sb.from('complaints').select('*').order('priority', { ascending: false }).order('created_at', { ascending: false }).limit(100);
+  let query = sb.from('complaints').select('*').order('created_at', { ascending: false }).limit(100);
   if (filter) query = query.eq('status', filter);
   const { data: rows, error } = await query;
 
@@ -2124,7 +2074,7 @@ async function renderStaffComplaints() {
   container.innerHTML = rows.map(c => `
     <div style="background: var(--light-bg); padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1rem;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-        <strong>${c.priority ? '⭐ ' : ''}${escapeHtml(c.subject)}</strong>${c.priority ? ' <span class=plus-seal>Prioridade</span>' : ''}
+        <strong>${escapeHtml(c.subject)}</strong>
         <span style="background:${statusColor[c.status] || '#999'}; color:#fff; font-size:0.7rem; padding:2px 10px; border-radius:999px;">${escapeHtml(COMPLAINT_STATUS[c.status] || c.status)}</span>
       </div>
       <p style="font-size:0.85rem; color:#666; margin:0.25rem 0;">${escapeHtml(COMPLAINT_KINDS[c.kind] || c.kind)} · ${escapeHtml(c.author_name || 'Conta excluída')}${c.author_email ? ' · ' + escapeHtml(c.author_email) : ''} · ${escapeHtml(fmtDateTime(c.created_at))}</p>
@@ -2406,157 +2356,11 @@ async function deleteMyAccount() {
 }
 
 
-// ===== PLANOS / ASSINATURAS (simulação) =====
-function setPlanAudience(aud) {
-  const ong = aud === 'ong';
-  document.getElementById('audAdopter').classList.toggle('active', !ong);
-  document.getElementById('audOng').classList.toggle('active', ong);
-  document.getElementById('plansAdopter').style.display = ong ? 'none' : '';
-  document.getElementById('plansOng').style.display = ong ? '' : 'none';
-}
-
-// ===== PLANOS: assinatura simulada (ativa por 1 ano, sem cobrança) =====
-const PLAN_LABELS = {
-  free: 'Grátis', plus: 'Adotador Plus', essencial: 'ONG Essencial', premium: 'ONG Premium',
-  parceira: 'Empresa Parceira', institucional: 'Prefeitura Institucional'
-};
-const PLAN_PRICES = { plus: 49.9, essencial: 119.9, premium: 199.9, parceira: 499 };
-const PLAN_FOR_ROLE = { adopter: ['plus'], ong: ['essencial', 'premium'], empresa: ['parceira'] };
-const PLAN_FEATURES = {
-  plus: ['Compatibilidade avançada', 'Meus Pets: carteirinha digital, histórico de saúde, lembretes e diário de evolução', 'Acompanhamento pós-adoção', 'Selo Adotador Plus no perfil', 'Pets novos 24 horas antes', '10% de desconto na lojinha e descontos em parceiros', 'Sem anúncios', 'Suporte prioritário'],
-  essencial: ['Mensagens com interessados e adotantes', 'Estatísticas básicas', 'Selo ONG Verificada', 'Link próprio da ONG', 'Card pronto de cada pet para compartilhar', 'Limite de 30 pets', 'Suporte prioritário'],
-  premium: ['Tudo do Essencial', 'Relatórios completos de adoção', 'Painel de desempenho', 'Visitas e entrevistas', 'Acompanhamento dos adotantes', 'Pets em destaque no topo', 'Equipe com mais administradores', 'Doações por Pix', 'Modelos de termo de adoção e questionário', 'Eventos de adoção', 'Limite de 100 pets'],
-  parceira: ['Destaque automático em Parceiros', 'Até 5 parceiros e 30 produtos', 'Anúncios (até 10)', 'Desconto para quem tem Adotador Plus', 'Desempenho: visualizações e cliques'],
-  institucional: ['Até 50 anúncios e campanhas', 'Indicadores do município', 'Desempenho das campanhas']
-};
-
-// Plano que vale hoje (plano vencido volta a ser grátis)
-function planOf(user) {
-  if (!user) return 'free';
-  const plan = user.plan || 'free';
-  if (plan === 'free') return 'free';
-  if (user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) return 'free';
-  return plan;
-}
-
-function hasPlan(user, ...plans) {
-  return plans.includes(planOf(user));
-}
-
-// Equipe da ONG: quem é administrador extra trabalha na conta da ONG dona
-let ongScope = null;
-
-async function loadOngScope() {
-  ongScope = null;
-  if (!currentUser || currentUser.user_type !== 'ong') return;
-  const { data } = await sb.from('ong_members').select('ong_id').eq('member_id', currentUser.id);
-  if (data && data.length) {
-    const { data: owner } = await sb.from('profiles').select('*').eq('id', data[0].ong_id).single();
-    if (owner) { ongScope = { id: owner.id, profile: owner, isMember: true }; return; }
-  }
-  ongScope = { id: currentUser.id, profile: currentUser, isMember: false };
-}
-
-function ongScopeId() {
-  return ongScope ? ongScope.id : (currentUser ? currentUser.id : null);
-}
-
-function ongPlan() {
-  return planOf(ongScope ? ongScope.profile : currentUser);
-}
-
-function isOngMember() {
-  return !!(ongScope && ongScope.isMember);
-}
-
 async function afterAuth() {
-  await loadOngScope();
-  if (typeof afterAuthExtras === 'function') await afterAuthExtras();
-}
-
-async function refreshCurrentUser() {
-  if (!currentUser) return;
-  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-  if (data) currentUser = data;
-  await loadOngScope();
-  updateHeader();
-}
-
-async function subscribePlan(planKey) {
-  if (!currentUser) {
-    alert('Entre ou crie uma conta para assinar um plano.');
-    openAuthModal();
-    return;
-  }
-  if (!(PLAN_FOR_ROLE[currentUser.user_type] || []).includes(planKey)) {
-    alert(`O plano ${PLAN_LABELS[planKey]} não é para contas do tipo "${getRoleLabel(currentUser.user_type)}".`);
-    return;
-  }
-  if (isOngMember()) {
-    alert('Quem assina é a conta principal da ONG.');
-    return;
-  }
-  if (!confirm(`Ativar o plano ${PLAN_LABELS[planKey]} por ${formatPrice(PLAN_PRICES[planKey])} ao ano?\n\nO pagamento é uma simulação: nada será cobrado.`)) return;
-  const { error } = await sb.rpc('subscribe_plan', { p_plan: planKey });
-  if (error) { alert('Não foi possível ativar o plano: ' + error.message); return; }
-  await refreshCurrentUser();
-  alert(`Plano ${PLAN_LABELS[planKey]} ativado! Os recursos já estão liberados.`);
-  showPage('my-plan');
-}
-
-async function cancelMyPlan() {
-  if (!confirm('Cancelar o seu plano? Você volta para o plano grátis e mantém o que já registrou.')) return;
-  const { error } = await sb.rpc('cancel_plan');
-  if (error) { alert('Não foi possível cancelar: ' + error.message); return; }
-  await refreshCurrentUser();
-  alert('Plano cancelado. Você voltou para o plano grátis.');
-  loadMyPlanPage();
+  // reservado para ações depois do login
 }
 
 // Marca o plano atual na página Planos
-function markCurrentPlan() {
-  const mine = planOf(currentUser);
-  document.querySelectorAll('#page-plans [data-plan]').forEach(btn => {
-    if (!btn.dataset.label) btn.dataset.label = btn.textContent;
-    const current = btn.dataset.plan === mine;
-    btn.textContent = current ? '✔ Seu plano atual' : btn.dataset.label;
-    btn.disabled = current;
-  });
-}
-
-async function loadMyPlanPage() {
-  const box = document.getElementById('myPlanContent');
-  const role = currentUser.user_type;
-  const plan = planOf(currentUser);
-  const options = PLAN_FOR_ROLE[role] || [];
-  let html = `<div class="plan-summary"><span class="plan-summary-label">Plano atual</span>
-    <h3>${escapeHtml(PLAN_LABELS[plan])}</h3>`;
-  if (plan !== 'free' && currentUser.plan_expires_at) {
-    html += `<p>Ativo até <strong>${new Date(currentUser.plan_expires_at).toLocaleDateString('pt-BR')}</strong>.</p>`;
-  }
-  if (plan !== 'free') {
-    html += '<ul class="plan-features">' + (PLAN_FEATURES[plan] || []).map(f => `<li>${escapeHtml(f)}</li>`).join('') + '</ul>';
-    if (plan !== 'institucional') html += '<button class="btn-secondary" onclick="cancelMyPlan()">Cancelar plano</button>';
-  } else if (options.length) {
-    html += '<p>Veja o que você ganha assinando:</p>' + options.map(p => `
-      <div class="plan-summary-option"><b>${escapeHtml(PLAN_LABELS[p])}</b> — ${formatPrice(PLAN_PRICES[p])}/ano
-        <ul class="plan-features">${PLAN_FEATURES[p].map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>
-      </div>`).join('') + '<button class="btn-primary" onclick="showPage(\'plans\')">Ver planos e assinar</button>';
-  } else if (role === 'prefeitura') {
-    html += `<p>O plano institucional é liberado pelo Administrador depois de uma proposta. Ele inclui: ${PLAN_FEATURES.institucional.join(', ').toLowerCase()}.</p>
-      <a class="btn-primary" style="text-decoration:none;" href="mailto:contato@petmatch.com?subject=Proposta%20-%20Prefeitura">Solicitar proposta</a>`;
-  }
-  html += '</div>';
-
-  const { data: subs } = await sb.from('subscriptions').select('*').eq('user_id', currentUser.id).order('starts_at', { ascending: false });
-  if (subs && subs.length) {
-    html += '<h3 style="margin-top:1.5rem;">Histórico de assinaturas</h3>' + subs.map(s => `
-      <div class="commerce-row"><div><b>${escapeHtml(PLAN_LABELS[s.plan] || s.plan)}</b><br>
-      <small>${new Date(s.starts_at).toLocaleDateString('pt-BR')} até ${new Date(s.ends_at).toLocaleDateString('pt-BR')} • ${formatPrice(s.price)}${s.cancelled_at ? ' • cancelada' : ''}</small></div></div>`).join('');
-  }
-  box.innerHTML = html;
-}
-
 
 // ===== PARCEIROS, ANÚNCIOS E LOJINHA =====
 const PARTNER_CATEGORIES = {
@@ -2567,7 +2371,6 @@ const PRODUCT_CATEGORIES = {
   caminha: '🛏️ Caminha', roupa: '👕 Roupa', coleira: '🦮 Coleira', brinquedo: '🎾 Brinquedo', outro: '🎁 Outro'
 };
 
-const PLUS_SHOP_DISCOUNT = 10;
 let adsCache = null;
 let partnersCache = [];
 let productsCache = [];
@@ -2614,10 +2417,6 @@ async function loadAds() {
 }
 
 function renderAds() {
-  if (hasPlan(currentUser, 'plus')) {
-    document.querySelectorAll('.ads-strip').forEach(el => { el.innerHTML = ''; el.style.display = 'none'; });
-    return;
-  }
   const city = (currentUser?.city || '').trim().toLowerCase();
   const ads = (adsCache || []).filter(ad => !ad.city || !city || ad.city.toLowerCase() === city).slice(0, 3);
   const html = ads.map(ad => {
@@ -2679,7 +2478,6 @@ function renderPartners() {
       ${p.address ? `<p>🏠 ${escapeHtml(p.address)}</p>` : ''}
       ${p.phone ? `<p>📞 ${escapeHtml(p.phone)}</p>` : ''}
       ${p.description ? `<p class="partner-desc">${escapeHtml(p.description)}</p>` : ''}
-      ${p.plus_discount ? `<p class="partner-plus">🎁 ${hasPlan(currentUser, 'plus') ? 'Você tem' : 'Adotador Plus tem'} ${p.plus_discount}% de desconto</p>` : ''}
       ${site ? `<a href="${escapeHtml(site)}" target="_blank" rel="noopener noreferrer">Visitar site</a>` : ''}
     </div>`;
   }).join('');
@@ -2696,49 +2494,91 @@ async function loadShopPage() {
   renderShop();
 }
 
+let shopSpecies = '';
+const SPECIES_WORDS = ['cães', 'gatos', 'coelhos', 'pássaros'];
+
 function setShopCategory(cat) {
   shopCategory = cat;
   document.querySelectorAll('#shopCats button').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
   renderShop();
 }
+function setShopSpecies(sp) {
+  shopSpecies = sp;
+  document.querySelectorAll('#shopSpecies button').forEach(b => b.classList.toggle('active', b.dataset.sp === sp));
+  renderShop();
+}
 
-function shopUnitPrice(p) {
-  return hasPlan(currentUser, 'plus') ? p.price * (1 - PLUS_SHOP_DISCOUNT / 100) : p.price;
+// Favoritos ficam guardados só neste aparelho
+let shopFavs = [];
+try { shopFavs = JSON.parse(localStorage.getItem('petmatch_shop_favs') || '[]'); if (!Array.isArray(shopFavs)) shopFavs = []; } catch (e) { shopFavs = []; }
+function toggleShopFav(id, ev) {
+  if (ev) ev.stopPropagation();
+  shopFavs = shopFavs.includes(id) ? shopFavs.filter(x => x !== id) : shopFavs.concat(id);
+  try { localStorage.setItem('petmatch_shop_favs', JSON.stringify(shopFavs)); } catch (e) { /* sem armazenamento */ }
+  renderShop();
+}
+
+// O produto serve ao animal escolhido se citar essa espécie ou se não citar nenhuma (serve para todos)
+function productFitsSpecies(p, sp) {
+  if (!sp) return true;
+  const txt = (p.name + ' ' + (p.description || '')).toLowerCase();
+  const cited = SPECIES_WORDS.filter(w => txt.includes(w));
+  return !cited.length || cited.includes(sp);
+}
+
+function productCardHtml(p) {
+  const img = safeImage(p.image_url);
+  const fav = shopFavs.includes(p.id);
+  return `<div class="partner-card product-card">
+    <button type="button" class="fav-btn ${fav ? 'on' : ''}" onclick="toggleShopFav('${p.id}', event)" aria-label="Favoritar">${fav ? '♥' : '♡'}</button>
+    <div class="product-click" onclick="openProduct('${p.id}')">
+      ${img ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(p.name)}" class="product-img" loading="lazy">` : `<div class="product-img product-noimg">${(PRODUCT_CATEGORIES[p.category] || '🎁').split(' ')[0]}</div>`}
+      <h3>${escapeHtml(p.name)}</h3>
+      <div class="product-price">${formatPrice(p.price)}</div>
+      <small class="partner-desc">${p.price >= 150 ? 'Frete grátis' : 'Frete grátis acima de R$ 150'}</small>
+    </div>
+    <button type="button" class="btn-primary" onclick="openProduct('${p.id}')">Ver produto</button>
+  </div>`;
 }
 
 function renderShop() {
   const grid = document.getElementById('shopGrid');
   const q = (document.getElementById('shopSearch')?.value || '').trim().toLowerCase();
   const sort = document.getElementById('shopSort')?.value || 'new';
-  let list = productsCache.filter(p => (!shopCategory || p.category === shopCategory) && (!q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q)));
+  let list = productsCache.filter(p => {
+    if (shopCategory === 'fav') { if (!shopFavs.includes(p.id)) return false; }
+    else if (shopCategory && p.category !== shopCategory) return false;
+    if (!productFitsSpecies(p, shopSpecies)) return false;
+    return !q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q);
+  });
   if (sort === 'low') list = list.slice().sort((a, b) => a.price - b.price);
   else if (sort === 'high') list = list.slice().sort((a, b) => b.price - a.price);
   else if (sort === 'az') list = list.slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   updateCartBadge();
+  const count = document.getElementById('shopCount');
+  const filtered = shopCategory || shopSpecies || q;
+  if (count) count.innerHTML = `${list.length} produto(s)` + (filtered ? ` <a href="#" onclick="clearShopFilters(); return false;">Limpar filtros</a>` : '');
   if (!list.length) {
-    grid.innerHTML = '<p style="text-align:center; color:#999; grid-column:1/-1;">Nenhum produto encontrado.</p>';
+    grid.innerHTML = '<p style="text-align:center; color:#999; grid-column:1/-1;">Nenhum produto encontrado. Tente outra busca ou limpe os filtros.</p>';
     return;
   }
-  grid.innerHTML = list.map(p => {
-    const img = safeImage(p.image_url);
-    const plus = hasPlan(currentUser, 'plus');
-    return `<div class="partner-card product-card">
-      <div class="product-click" onclick="openProduct('${p.id}')">
-        ${img ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(p.name)}" class="product-img" loading="lazy">` : `<div class="product-img product-noimg">${(PRODUCT_CATEGORIES[p.category] || '🎁').split(' ')[0]}</div>`}
-        <h3>${escapeHtml(p.name)}</h3>
-      </div>
-      ${plus
-        ? `<div class="product-price"><s class="product-old">${formatPrice(p.price)}</s> ${formatPrice(shopUnitPrice(p))}<small class="partner-plus"> Plus -${PLUS_SHOP_DISCOUNT}%</small></div>`
-        : `<div class="product-price">${formatPrice(p.price)}</div><small class="partner-desc">Com Adotador Plus: ${formatPrice(p.price * (1 - PLUS_SHOP_DISCOUNT / 100))}</small>`}
-      <button type="button" class="btn-primary" onclick="openProduct('${p.id}')">Ver produto</button>
-    </div>`;
-  }).join('');
+  grid.innerHTML = list.map(productCardHtml).join('');
+}
+
+function clearShopFilters() {
+  shopCategory = ''; shopSpecies = '';
+  const s = document.getElementById('shopSearch'); if (s) s.value = '';
+  document.querySelectorAll('#shopCats button').forEach(b => b.classList.toggle('active', b.dataset.cat === ''));
+  document.querySelectorAll('#shopSpecies button').forEach(b => b.classList.toggle('active', b.dataset.sp === ''));
+  renderShop();
 }
 
 // ----- Carrinho e compra simulada -----
 const SIZED_CATEGORIES = ['roupa', 'coleira'];
 const SIZE_GUIDE = [['P', 'até 5 kg'], ['M', 'de 5 a 12 kg'], ['G', 'de 12 a 25 kg'], ['GG', 'acima de 25 kg']];
+const COUPONS = { PETMATCH10: 10 };
 let cart = [];
+let couponCode = '';
 try { cart = JSON.parse(localStorage.getItem('petmatch_cart') || '[]'); if (!Array.isArray(cart)) cart = []; } catch (e) { cart = []; }
 
 function saveCart() {
@@ -2746,8 +2586,15 @@ function saveCart() {
   updateCartBadge();
 }
 function updateCartBadge() {
+  const n = cart.reduce((s, i) => s + i.qty, 0);
   const el = document.getElementById('cartBadge');
-  if (el) el.textContent = cart.reduce((s, i) => s + i.qty, 0);
+  if (el) el.textContent = n;
+  const fab = document.getElementById('cartFab');
+  if (fab) {
+    fab.classList.toggle('has-items', n > 0);
+    const tot = document.getElementById('cartFabTotal');
+    if (tot) tot.textContent = n ? '· ' + formatPrice(cartTotals().total) : '';
+  }
 }
 function showToast(msg) {
   const el = document.createElement('div');
@@ -2762,13 +2609,14 @@ function openProduct(id) {
   if (!p) return;
   const img = safeImage(p.image_url);
   const sized = SIZED_CATEGORIES.includes(p.category);
-  const plus = hasPlan(currentUser, 'plus');
+  const related = productsCache.filter(x => x.id !== id && x.category === p.category).slice(0, 4);
   openPetToolModal(`
     <div class="pd">
       ${img ? `<img src="${escapeHtml(img)}" alt="${escapeHtml(p.name)}" class="pd-img">` : ''}
       <span class="partner-cat">${PRODUCT_CATEGORIES[p.category] || PRODUCT_CATEGORIES.outro}</span>
       <h2>${escapeHtml(p.name)}</h2>
-      <div class="product-price" style="font-size:1.5rem;">${plus ? `<s class="product-old">${formatPrice(p.price)}</s> ${formatPrice(shopUnitPrice(p))} <small class="partner-plus">Plus -${PLUS_SHOP_DISCOUNT}%</small>` : formatPrice(p.price)}</div>
+      <div class="product-price" style="font-size:1.5rem;">${formatPrice(p.price)}</div>
+      <small class="partner-desc">${p.price >= 150 ? '🚚 Frete grátis' : 'Frete grátis acima de R$ 150'}</small>
       ${p.description ? `<p>${escapeHtml(p.description)}</p>` : ''}
       ${sized ? `<h4>Tamanho</h4><div class="size-picker" id="pdSizes">${SIZE_GUIDE.map(([s]) => `<button type="button" class="size-btn" data-size="${s}" onclick="pickSize('${s}')">${s}</button>`).join('')}</div>
         <details class="size-guide"><summary>Guia de tamanhos</summary>${SIZE_GUIDE.map(([s, w]) => `<div><b>${s}</b> — ${w}</div>`).join('')}<small>Dica: meça o peito do pet e compare com o peso; na dúvida, escolha o tamanho maior.</small></details>` : ''}
@@ -2778,6 +2626,7 @@ function openProduct(id) {
         <button type="button" class="btn-secondary" onclick="addToCart('${p.id}', false)">Adicionar ao carrinho</button>
         <button type="button" class="btn-primary" onclick="addToCart('${p.id}', true)">Comprar agora</button>
       </div>
+      ${related.length ? `<h4>Você também pode gostar</h4><div class="related">${related.map(r => `<div class="related-item" onclick="openProduct('${r.id}')">${safeImage(r.image_url) ? `<img src="${escapeHtml(safeImage(r.image_url))}" alt="" loading="lazy">` : '<div class="cart-noimg">🎁</div>'}<small>${escapeHtml(r.name)}</small><b>${formatPrice(r.price)}</b></div>`).join('')}</div>` : ''}
     </div>`);
   window.__pdSize = null;
 }
@@ -2805,17 +2654,25 @@ function addToCart(id, goCart) {
 }
 
 function cartTotals() {
-  const plus = hasPlan(currentUser, 'plus');
   const raw = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const discount = plus ? raw * PLUS_SHOP_DISCOUNT / 100 : 0;
+  const pct = COUPONS[couponCode] || 0;
+  const discount = raw * pct / 100;
   const sub = raw - discount;
   const shipping = !cart.length || sub >= 150 ? 0 : 12.9;
-  return { raw, discount, sub, shipping, total: sub + shipping };
+  return { raw, discount, pct, sub, shipping, total: sub + shipping };
+}
+
+function applyCoupon() {
+  const code = (document.getElementById('coCoupon').value || '').trim().toUpperCase();
+  if (!code) { couponCode = ''; openCart(); return; }
+  if (!COUPONS[code]) { alert('Cupom inválido.'); return; }
+  couponCode = code;
+  openCart();
 }
 
 function openCart() {
   if (!cart.length) {
-    openPetToolModal('<h2>🛒 Seu carrinho</h2><p style="color:#888;">O carrinho está vazio. Escolha produtos na vitrine.</p>');
+    openPetToolModal('<h2>🛒 Seu carrinho</h2><p style="color:#888;">O carrinho está vazio. Escolha produtos na vitrine.</p><button type="button" class="btn-primary" onclick="closePetToolModal()">Ver produtos</button>');
     return;
   }
   const t = cartTotals();
@@ -2828,11 +2685,12 @@ function openCart() {
         <div class="qty"><button type="button" onclick="cartQty(${idx}, -1)">−</button><span>${i.qty}</span><button type="button" onclick="cartQty(${idx}, 1)">+</button></div>
         <button type="button" class="btn-secondary" style="color:#c0392b; padding:2px 10px;" onclick="cartRemove(${idx})">✕</button>
       </div>`).join('')}
+    <div class="coupon-row"><input type="text" id="coCoupon" placeholder="Cupom de desconto" value="${escapeHtml(couponCode)}" maxlength="20"><button type="button" class="btn-secondary" onclick="applyCoupon()">Aplicar</button></div>
     <div class="cart-totals">
       <div><span>Subtotal</span><span>${formatPrice(t.raw)}</span></div>
-      ${t.discount ? `<div class="partner-plus"><span>Desconto Adotador Plus (${PLUS_SHOP_DISCOUNT}%)</span><span>− ${formatPrice(t.discount)}</span></div>` : ''}
+      ${t.discount ? `<div class="partner-plus"><span>Cupom ${escapeHtml(couponCode)} (${t.pct}%)</span><span>− ${formatPrice(t.discount)}</span></div>` : ''}
       <div><span>Frete</span><span>${t.shipping ? formatPrice(t.shipping) : 'Grátis'}</span></div>
-      ${!t.shipping ? '' : '<small>Frete grátis em compras a partir de R$ 150,00.</small>'}
+      ${!t.shipping ? '' : `<small>Faltam ${formatPrice(150 - t.sub)} para o frete grátis.</small>`}
       <div class="cart-total"><span>Total</span><span>${formatPrice(t.total)}</span></div>
     </div>
     <h4>Entrega e pagamento</h4>
@@ -2864,7 +2722,7 @@ function checkoutOrder(e) {
   const pay = { pix: 'Pix', card: 'Cartão de crédito', boleto: 'Boleto' }[document.getElementById('coPay').value];
   const order = 'PM' + Date.now().toString(36).toUpperCase().slice(-6);
   const items = cart.reduce((s, i) => s + i.qty, 0);
-  cart = []; saveCart();
+  cart = []; couponCode = ''; saveCart();
   openPetToolModal(`
     <div style="text-align:center;">
       <div style="font-size:3rem;">🎉</div>
@@ -2876,7 +2734,6 @@ function checkoutOrder(e) {
     </div>`);
 }
 
-// ----- Gestão (Administrador e Supervisor) -----
 async function renderCommerceLists() {
   const [p, a, d] = await Promise.all([
     sb.from('partners').select('*').order('created_at', { ascending: false }),
@@ -2943,7 +2800,6 @@ async function saveCommerce(e, kind) {
       longitude: val('cpLng') === '' ? null : parseFloat(val('cpLng')),
       address: val('cpAddress') || null,
       phone: val('cpPhone') || null, description: val('cpDescription') || null,
-      plus_discount: val('cpDiscount') === '' ? null : Math.min(50, Math.max(0, parseInt(val('cpDiscount'), 10) || 0)),
       is_featured: document.getElementById('cpFeatured').checked
     };
   } else if (kind === 'ad') {
@@ -2991,7 +2847,6 @@ async function deleteCommerce(table, id) {
   renderCommerceLists();
 }
 
-
 // Explicação completa do anúncio (o que é, quem anuncia, onde fica, como chegar)
 function openAdModal(adId) {
   const ad = (adsCache || []).find(a => a.id === adId);
@@ -3015,7 +2870,6 @@ function openAdModal(adId) {
 function closeAdModal() {
   document.getElementById('adModal').classList.remove('active');
 }
-
 
 // ----- Localização do usuário (só no aparelho, não é enviada nem guardada) -----
 let userPos = null;
@@ -3060,12 +2914,9 @@ function stopUsingLocation() {
   renderPartners();
 }
 
-
 // ============================================================================
-// ADOTADOR: compatibilidade (básica grátis, avançada no Plus)
+// ADOTADOR: compatibilidade (espécie, porte e energia)
 // ============================================================================
-const SIZE_LABELS = { small: 'Pequeno', medium: 'Médio', large: 'Grande' };
-const TYPE_LABELS = { dog: 'Cão', cat: 'Gato', rabbit: 'Coelho', bird: 'Pássaro' };
 
 function matchPrefs() {
   return (currentUser && currentUser.user_type === 'adopter' && currentUser.match_prefs) || {};
@@ -3073,199 +2924,52 @@ function matchPrefs() {
 
 function hasMatchPrefs() {
   const p = matchPrefs();
-  return !!(p.type || p.size || p.energy || p.home || p.hours || p.exp || p.kids);
+  return !!(p.type || p.size || p.energy);
 }
 
 // Calcula o quanto o pet combina com o que o adotador procura (estimativa)
 function petCompat(pet) {
   if (!hasMatchPrefs()) return null;
   const p = matchPrefs();
-  const advanced = hasPlan(currentUser, 'plus');
   const energy = pet.energy || 'Moderada';
+  const sizes = ['small', 'medium', 'large'];
   const parts = [];
-  const add = (weight, ratio, okText, badText) => parts.push({ weight, ratio, okText, badText });
-
-  if (p.type) add(advanced ? 25 : 40, p.type === pet.type ? 1 : 0, 'É da espécie que você procura.', 'Não é a espécie que você procura.');
-  if (p.size) add(advanced ? 15 : 35, p.size === pet.size ? 1 : (Math.abs(['small', 'medium', 'large'].indexOf(p.size) - ['small', 'medium', 'large'].indexOf(pet.size)) === 1 ? 0.5 : 0), 'O porte é o que você procura.', 'O porte é diferente do que você procura.');
-  if (p.energy) add(advanced ? 15 : 25, p.energy === energy ? 1 : (p.energy === 'Moderada' || energy === 'Moderada' ? 0.5 : 0), 'A energia combina com a sua.', 'A energia é diferente da que você procura.');
-
-  if (advanced) {
-    if (p.home) {
-      const base = { apto: { small: 1, medium: 0.7, large: 0.2 }, casa: { small: 1, medium: 0.9, large: 0.6 }, quintal: { small: 1, medium: 1, large: 1 } }[p.home][pet.size] ?? 1;
-      const ratio = (p.home === 'apto' && energy === 'Alta') ? base * 0.6 : base;
-      add(15, ratio, 'O espaço da sua casa é adequado para o porte e a energia dele.', 'O espaço da sua casa pode ser pequeno para o porte ou a energia dele.');
-    }
-    if (p.hours) {
-      let ratio = { pouco: { Alta: 0.2, Moderada: 0.6, Baixa: 1 }, medio: { Alta: 0.7, Moderada: 1, Baixa: 1 }, muito: { Alta: 1, Moderada: 1, Baixa: 1 } }[p.hours][energy] ?? 1;
-      if (p.hours === 'pouco' && Number(pet.age) <= 1) ratio *= 0.5;
-      add(15, ratio, 'O seu tempo livre é suficiente para a rotina dele.', 'Ele pede mais tempo de atenção do que você tem disponível.');
-    }
-    if (p.exp) {
-      const hard = pet.size === 'large' || energy === 'Alta';
-      const ratio = { primeira: hard ? 0.5 : 1, alguma: hard ? 0.85 : 1, experiente: 1 }[p.exp];
-      add(10, ratio, 'Combina com a sua experiência.', 'Pode ser um desafio para quem está começando.');
-    }
-    if (p.kids === 'sim') {
-      const ratio = (pet.size === 'large' && energy === 'Alta') ? 0.6 : 1;
-      add(5, ratio, 'Bom para casas com crianças.', 'Um pet grande e agitado pede cuidado perto de crianças.');
-    }
-  }
-
-  const max = parts.reduce((s, x) => s + x.weight, 0);
+  if (p.type) parts.push({ w: 40, r: p.type === pet.type ? 1 : 0, ok: 'É da espécie que você procura.', bad: 'Não é a espécie que você procura.' });
+  if (p.size) parts.push({ w: 35, r: p.size === pet.size ? 1 : (Math.abs(sizes.indexOf(p.size) - sizes.indexOf(pet.size)) === 1 ? 0.5 : 0), ok: 'O porte é o que você procura.', bad: 'O porte é diferente do que você procura.' });
+  if (p.energy) parts.push({ w: 25, r: p.energy === energy ? 1 : (p.energy === 'Moderada' || energy === 'Moderada' ? 0.5 : 0), ok: 'A energia combina com a sua.', bad: 'A energia é diferente da que você procura.' });
+  const max = parts.reduce((s, x) => s + x.w, 0);
   if (!max) return null;
-  const score = Math.round(parts.reduce((s, x) => s + x.weight * x.ratio, 0) / max * 100);
-  const reasons = parts.map(x => ({ ok: x.ratio >= 0.7, text: x.ratio >= 0.7 ? x.okText : x.badText }));
-  if (advanced && p.other === 'sim') reasons.push({ ok: null, text: 'Você tem outros animais: pergunte à ONG como ele convive com eles.' });
-  return { score, reasons, advanced };
+  const score = Math.round(parts.reduce((s, x) => s + x.w * x.r, 0) / max * 100);
+  return { score, reasons: parts.map(x => ({ ok: x.r >= 0.7, text: x.r >= 0.7 ? x.ok : x.bad })) };
 }
 
 function compatDetailHtml(pet) {
   if (!currentUser || currentUser.user_type !== 'adopter') return '';
   const c = petCompat(pet);
   if (!c) return '<p style="text-align:center;"><a href="#" onclick="closePetDetailModal(); showPage(\'compat\'); return false;">💚 Diga o que você procura e veja a compatibilidade</a></p>';
-  const list = c.advanced
-    ? '<ul class="compat-reasons">' + c.reasons.map(r => `<li>${r.ok === null ? 'ℹ️' : (r.ok ? '✅' : '⚠️')} ${escapeHtml(r.text)}</li>`).join('') + '</ul>'
-    : '<p style="font-size:0.85rem; color:#777;">Compatibilidade básica (espécie, porte e energia). Com o <a href="#" onclick="closePetDetailModal(); showPage(\'plans\'); return false;">Adotador Plus</a> a análise inclui casa, rotina, experiência e crianças.</p>';
-  return `<div class="compat-box"><h3 style="margin-top:0;">💚 ${c.score}% compatível</h3>${list}</div>`;
+  return `<div class="compat-box"><h3 style="margin-top:0;">💚 ${c.score}% compatível</h3><ul class="compat-reasons">${c.reasons.map(r => `<li>${r.ok ? '✅' : '⚠️'} ${escapeHtml(r.text)}</li>`).join('')}</ul></div>`;
 }
 
 function loadCompatForm() {
   const p = matchPrefs();
-  const plus = hasPlan(currentUser, 'plus');
   document.getElementById('cpType').value = p.type || '';
   document.getElementById('cpSize').value = p.size || '';
   document.getElementById('cpEnergy').value = p.energy || '';
-  ['Home:home', 'Hours:hours', 'Exp:exp', 'Kids:kids', 'Other:other'].forEach(pair => {
-    const [id, key] = pair.split(':');
-    const el = document.getElementById('cp' + id);
-    el.value = p[key] || '';
-    el.disabled = !plus;
-  });
-  document.getElementById('compatLock').innerHTML = plus ? '' :
-    '<p class="compat-lock">🔒 A análise avançada (casa, rotina, experiência e crianças) é do <a href="#" onclick="showPage(\'plans\'); return false;">Adotador Plus</a>.</p>';
 }
 
 async function saveCompat(e) {
   e.preventDefault();
-  const plus = hasPlan(currentUser, 'plus');
   const prefs = {
     type: document.getElementById('cpType').value,
     size: document.getElementById('cpSize').value,
     energy: document.getElementById('cpEnergy').value
   };
-  if (plus) {
-    prefs.home = document.getElementById('cpHome').value;
-    prefs.hours = document.getElementById('cpHours').value;
-    prefs.exp = document.getElementById('cpExp').value;
-    prefs.kids = document.getElementById('cpKids').value;
-    prefs.other = document.getElementById('cpOther').value;
-  } else {
-    const old = matchPrefs();
-    ['home', 'hours', 'exp', 'kids', 'other'].forEach(k => { if (old[k]) prefs[k] = old[k]; });
-  }
   Object.keys(prefs).forEach(k => { if (!prefs[k]) delete prefs[k]; });
   const { error } = await sb.from('profiles').update({ match_prefs: prefs }).eq('id', currentUser.id);
   if (error) { alert('Erro ao salvar: ' + error.message); return; }
   currentUser = { ...currentUser, match_prefs: prefs };
   alert('Preferências salvas! Os pets agora mostram a compatibilidade.');
   showPage('pets');
-}
-
-// Pets novos (últimas 24 horas): primeiro para o Adotador Plus
-function isNewPet(pet) {
-  return pet.created_at && (Date.now() - new Date(pet.created_at).getTime()) < 24 * 3600 * 1000;
-}
-function canSeeNewPets() {
-  return !!currentUser && (currentUser.user_type !== 'adopter' || hasPlan(currentUser, 'plus'));
-}
-
-function copyText(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => alert('Copiado!'), () => prompt('Copie:', text));
-  } else {
-    prompt('Copie:', text);
-  }
-}
-
-// ============================================================================
-// ADOTADOR: Meus Pets (carteirinha, saúde, lembretes, diário, pós-adoção)
-// ============================================================================
-let myAdopted = [];
-
-async function loadAdoptedRequests() {
-  const { data } = await sb
-    .from('adoption_requests')
-    .select('id, created_at, pet_id, pets(name, type, breed, age, size, image_url, ong_id)')
-    .eq('adopter_id', currentUser.id)
-    .eq('status', 'completed')
-    .order('created_at', { ascending: false });
-  return data || [];
-}
-
-function daysSince(date) {
-  return Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 86400000));
-}
-
-function dueInfo(rec) {
-  if (!rec.next_due) return null;
-  const d = new Date(rec.next_due + 'T12:00:00');
-  const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
-  if (diff > 7) return null;
-  return { overdue: diff < 0, days: diff, date: d.toLocaleDateString('pt-BR') };
-}
-
-async function loadMyPetsPage() {
-  const plus = hasPlan(currentUser, 'plus');
-  const content = document.getElementById('myPetsContent');
-  content.innerHTML = '<p style="color:#999; grid-column:1/-1;">Carregando...</p>';
-  document.getElementById('myPetsLock').innerHTML = plus ? '' : `
-    <div class="compat-lock">🔒 Para registrar saúde, diário e lembretes você precisa do <a href="#" onclick="showPage('plans'); return false;">Adotador Plus</a>.
-    A carteirinha e o que você já registrou continuam disponíveis.</div>`;
-
-  myAdopted = await loadAdoptedRequests();
-  if (!myAdopted.length) {
-    content.innerHTML = '<p style="color:#999; grid-column:1/-1; text-align:center;">Quando uma ONG concluir a sua adoção, o seu pet aparece aqui.</p>';
-    document.getElementById('myPetsReminders').innerHTML = '';
-    return;
-  }
-
-  const ids = myAdopted.map(r => r.id);
-  const [{ data: recs }, { data: diary }] = await Promise.all([
-    sb.from('pet_care_records').select('*').in('request_id', ids),
-    sb.from('pet_diary').select('id, request_id, note, created_at').in('request_id', ids).order('created_at', { ascending: false })
-  ]);
-
-  // Lembretes: vencem em até 7 dias ou já venceram
-  const due = [];
-  (recs || []).forEach(rec => {
-    const info = dueInfo(rec);
-    if (info) due.push({ rec, info, petName: (myAdopted.find(r => r.id === rec.request_id)?.pets || {}).name });
-  });
-  document.getElementById('myPetsReminders').innerHTML = due.length ? `
-    <div class="reminders-box"><h3>🔔 Lembretes</h3>${due.map(d => `
-      <div class="commerce-row"><div><b>${escapeHtml(d.rec.title)}</b> de ${escapeHtml(d.petName || 'pet')}<br>
-      <small>${d.info.overdue ? '⚠️ Atrasado desde ' : 'Vence em '}${d.info.date}</small></div>
-      ${plus ? `<button class="btn-secondary" onclick="markReminderDone('${d.rec.id}')">Feito</button>` : ''}</div>`).join('')}</div>` : '';
-
-  content.innerHTML = myAdopted.map(r => {
-    const pet = r.pets || {};
-    const days = daysSince(r.created_at);
-    const entries = (diary || []).filter(d => d.request_id === r.id);
-    const pct = Math.min(100, Math.round(days / 30 * 100));
-    return `
-    <div class="partner-card product-card">
-      <img src="${escapeHtml(pet.image_url || 'images/pet-dog-brown-1.png')}" alt="${escapeHtml(pet.name || '')}" class="product-img">
-      <h3>${escapeHtml(pet.name || 'Pet')}</h3>
-      <p>Adotado em ${new Date(r.created_at).toLocaleDateString('pt-BR')} • dia ${days + 1} em casa</p>
-      <div class="adapt-bar" title="Primeiros 30 dias de adaptação"><div style="width:${pct}%"></div></div>
-      <small class="partner-desc">${days < 30 ? 'Primeiros 30 dias de adaptação' : 'Adaptação concluída'} • ${entries.length} registro(s) no diário${entries[0] ? '<br>Último: ' + escapeHtml(entries[0].note.slice(0, 60)) : ''}</small>
-      <div class="pet-tool-buttons">
-        <button class="btn-secondary" onclick="openPetCard('${r.id}')">🪪 Carteirinha</button>
-        <button class="btn-secondary" onclick="openPetHealth('${r.id}')">💉 Saúde</button>
-        <button class="btn-secondary" onclick="openPetDiary('${r.id}')">📔 Diário</button>
-      </div>
-    </div>`;
-  }).join('');
 }
 
 function closePetToolModal() {
@@ -3277,521 +2981,9 @@ function openPetToolModal(html) {
   document.getElementById('petToolModal').classList.add('active');
 }
 
-async function openPetCard(requestId) {
-  const r = myAdopted.find(x => x.id === requestId);
-  if (!r) return;
-  const pet = r.pets || {};
-  const [{ data: recs }, { data: ong }] = await Promise.all([
-    sb.from('pet_care_records').select('*').eq('request_id', requestId).order('record_date', { ascending: true }),
-    sb.from('profiles').select('name').eq('id', pet.ong_id).single()
-  ]);
-  const vacc = (recs || []).filter(x => x.kind === 'vacina');
-  const fmt = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
-  openPetToolModal(`
-    <div class="carteirinha">
-      <div class="carteirinha-head"><span>🐾 PetMatch</span><b>CARTEIRINHA DIGITAL</b></div>
-      <div class="carteirinha-body">
-        <img src="${escapeHtml(pet.image_url || 'images/pet-dog-brown-1.png')}" alt="">
-        <div>
-          <h2>${escapeHtml(pet.name || '')}</h2>
-          <p><b>Espécie:</b> ${escapeHtml(TYPE_LABELS[pet.type] || '—')}</p>
-          <p><b>Raça:</b> ${escapeHtml(pet.breed || '—')}</p>
-          <p><b>Idade na adoção:</b> ${escapeHtml(pet.age)} ano(s)</p>
-          <p><b>Porte:</b> ${escapeHtml(SIZE_LABELS[pet.size] || '—')}</p>
-          <p><b>Tutor:</b> ${escapeHtml(currentUser.name)}</p>
-          <p><b>Adotado em:</b> ${new Date(r.created_at).toLocaleDateString('pt-BR')} (ONG ${escapeHtml(ong ? ong.name : '—')})</p>
-        </div>
-      </div>
-      <h4>Vacinas</h4>
-      ${vacc.length ? `<table class="log-table"><tr><th>Vacina</th><th>Data</th><th>Próxima</th></tr>${vacc.map(v => `<tr><td>${escapeHtml(v.title)}</td><td>${fmt(v.record_date)}</td><td>${fmt(v.next_due)}</td></tr>`).join('')}</table>` : '<p style="color:#888;">Nenhuma vacina registrada ainda.</p>'}
-      <p class="carteirinha-foot">Registro nº ${escapeHtml(requestId.slice(0, 8).toUpperCase())} • emitido em ${new Date().toLocaleDateString('pt-BR')}</p>
-    </div>
-    <button class="btn-primary" style="width:100%; margin-top:1rem;" onclick="printPetCard()">Imprimir ou salvar em PDF</button>`);
-}
-
-function printPetCard() {
-  document.body.classList.add('printing-card');
-  window.print();
-  setTimeout(() => document.body.classList.remove('printing-card'), 500);
-}
-
-const CARE_KINDS = { consulta: 'Consulta', vacina: 'Vacina', vermifugo: 'Vermífugo', outro: 'Outro cuidado' };
-
-async function openPetHealth(requestId) {
-  const r = myAdopted.find(x => x.id === requestId);
-  if (!r) return;
-  const plus = hasPlan(currentUser, 'plus');
-  const { data: recs } = await sb.from('pet_care_records').select('*').eq('request_id', requestId).order('record_date', { ascending: false });
-  const fmt = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '';
-  openPetToolModal(`
-    <h2>💉 Saúde de ${escapeHtml((r.pets || {}).name || 'pet')}</h2>
-    ${plus ? `
-    <form onsubmit="saveCareRecord(event, '${requestId}')" class="commerce-form">
-      <select id="crKind">${Object.entries(CARE_KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-      <input type="text" id="crTitle" placeholder="O que foi feito (ex.: V10, consulta de rotina)" maxlength="120" required>
-      <label class="commerce-check">Data <input type="date" id="crDate" value="${new Date().toISOString().slice(0, 10)}" required></label>
-      <label class="commerce-check">Próxima (lembrete) <input type="date" id="crNext"></label>
-      <input type="text" id="crNotes" placeholder="Observações (opcional)" maxlength="1000">
-      <button class="btn-primary" type="submit">Adicionar</button>
-    </form>` : '<p class="compat-lock">🔒 Registrar novos cuidados é do Adotador Plus.</p>'}
-    ${(recs || []).length ? (recs || []).map(x => `
-      <div class="commerce-row"><div><b>${CARE_KINDS[x.kind] || x.kind}: ${escapeHtml(x.title)}</b><br>
-        <small>${fmt(x.record_date)}${x.next_due ? ' • próxima: ' + fmt(x.next_due) : ''}${x.notes ? ' • ' + escapeHtml(x.notes) : ''}</small></div>
-        <button class="btn-secondary" style="color:#c0392b;" onclick="deleteCareRecord('${x.id}', '${requestId}')">Apagar</button></div>`).join('')
-      : '<p style="color:#888;">Nenhum registro de saúde ainda.</p>'}`);
-}
-
-async function saveCareRecord(e, requestId) {
-  e.preventDefault();
-  const row = {
-    request_id: requestId, adopter_id: currentUser.id,
-    kind: document.getElementById('crKind').value,
-    title: document.getElementById('crTitle').value.trim(),
-    record_date: document.getElementById('crDate').value,
-    next_due: document.getElementById('crNext').value || null,
-    notes: document.getElementById('crNotes').value.trim() || null
-  };
-  const { error } = await sb.from('pet_care_records').insert([row]);
-  if (error) { alert('Não foi possível salvar: ' + error.message); return; }
-  syncCareReminders();
-  openPetHealth(requestId);
-}
-
-async function deleteCareRecord(id, requestId) {
-  if (!confirm('Apagar este registro?')) return;
-  const { error } = await sb.from('pet_care_records').delete().eq('id', id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  openPetHealth(requestId);
-}
-
-async function markReminderDone(id) {
-  const { error } = await sb.from('pet_care_records').update({ next_due: null }).eq('id', id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  loadMyPetsPage();
-}
-
-const DIARY_KINDS = { note: '📝 Anotação', behavior: '🐕 Comportamento', routine: '🕒 Rotina' };
-
-async function openPetDiary(requestId) {
-  const r = myAdopted.find(x => x.id === requestId);
-  if (!r) return;
-  const plus = hasPlan(currentUser, 'plus');
-  const { data: entries } = await sb.from('pet_diary').select('*').eq('request_id', requestId).order('created_at', { ascending: false });
-  openPetToolModal(`
-    <h2>📔 Diário de ${escapeHtml((r.pets || {}).name || 'pet')}</h2>
-    <p style="color:#777; font-size:0.9rem;">Registre a adaptação: comportamento, rotina e momentos especiais, com fotos.</p>
-    ${plus ? `
-    <form onsubmit="saveDiaryEntry(event, '${requestId}')" class="commerce-form">
-      <select id="dyKind">${Object.entries(DIARY_KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-      <textarea id="dyNote" placeholder="O que aconteceu hoje?" maxlength="1500" rows="3" required style="grid-column:1/-1; padding:0.6rem; border:1px solid var(--border-color); border-radius:10px; font-family:inherit;"></textarea>
-      <input type="file" id="dyPhoto" accept="image/*">
-      <button class="btn-primary" type="submit">Registrar</button>
-    </form>` : '<p class="compat-lock">🔒 Novos registros no diário são do Adotador Plus.</p>'}
-    ${(entries || []).length ? (entries || []).map(x => `
-      <div class="diary-entry">
-        <small>${DIARY_KINDS[x.kind] || ''} • ${fmtDateTime(x.created_at)}</small>
-        <p>${escapeHtml(x.note)}</p>
-        ${safeImage(x.photo_url) ? `<img src="${escapeHtml(safeImage(x.photo_url))}" alt="Foto do diário">` : ''}
-        <button class="btn-secondary" style="color:#c0392b; padding:2px 10px;" onclick="deleteDiaryEntry('${x.id}', '${requestId}')">Apagar</button>
-      </div>`).join('') : '<p style="color:#888;">O diário ainda está vazio.</p>'}`);
-}
-
-async function saveDiaryEntry(e, requestId) {
-  e.preventDefault();
-  const row = { request_id: requestId, adopter_id: currentUser.id, kind: document.getElementById('dyKind').value, note: document.getElementById('dyNote').value.trim() };
-  const file = document.getElementById('dyPhoto').files[0];
-  try {
-    if (file) row.photo_url = await uploadFileToBucket('user-uploads', file, `diary/${currentUser.id}`);
-  } catch (err) {
-    alert('Erro ao enviar a foto: ' + err.message);
-    return;
-  }
-  const { error } = await sb.from('pet_diary').insert([row]);
-  if (error) { alert('Não foi possível salvar: ' + error.message); return; }
-  openPetDiary(requestId);
-}
-
-async function deleteDiaryEntry(id, requestId) {
-  if (!confirm('Apagar este registro do diário?')) return;
-  const { error } = await sb.from('pet_diary').delete().eq('id', id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  openPetDiary(requestId);
-}
-
-// Lembretes viram notificações (uma vez por lembrete)
-async function syncCareReminders() {
-  if (!currentUser || currentUser.user_type !== 'adopter' || !hasPlan(currentUser, 'plus')) return;
-  const adopted = await loadAdoptedRequests();
-  if (!adopted.length) return;
-  const { data: recs } = await sb.from('pet_care_records').select('*').in('request_id', adopted.map(r => r.id));
-  const { data: existing } = await sb.from('notifications').select('message').eq('adopter_id', currentUser.id);
-  const have = new Set((existing || []).map(n => n.message));
-  for (const rec of (recs || [])) {
-    const info = dueInfo(rec);
-    if (!info) continue;
-    const petName = (adopted.find(r => r.id === rec.request_id)?.pets || {}).name || 'seu pet';
-    const message = `Lembrete: ${rec.title} de ${petName} ${info.overdue ? 'está atrasado (era para ' + info.date + ')' : 'vence em ' + info.date}.`;
-    if (have.has(message)) continue;
-    await sb.from('notifications').insert([{ adopter_id: currentUser.id, request_id: rec.request_id, message }]);
-    have.add(message);
-  }
-  refreshNotificationBadge();
-}
-
-async function afterAuthExtras() {
-  syncCareReminders();
-}
-
-
-// ============================================================================
-// ONG: plano, uso, chat, acompanhamento, divulgação, eventos, relatórios, equipe
-// ============================================================================
-const ONG_PET_LIMITS = { free: 10, essencial: 30, premium: 100 };
-
-async function renderOngBanner() {
-  const el = document.getElementById('ongPlanBanner');
-  if (!el) return;
-  const plan = ongPlan();
-  const { count } = await sb.from('pets').select('*', { count: 'exact', head: true }).eq('ong_id', ongScopeId());
-  const limit = ONG_PET_LIMITS[plan] || 10;
-  const pct = Math.min(100, Math.round((count || 0) / limit * 100));
-  el.innerHTML = `
-    <div class="ong-banner">
-      <div><b>Plano: ${escapeHtml(PLAN_LABELS[plan] || plan)}</b>${isOngMember() ? ` • você é administrador da ONG ${escapeHtml(ongScope.profile.name)}` : ''}<br>
-      <small>Pets cadastrados: ${count || 0} de ${limit}</small>
-      <div class="adapt-bar"><div style="width:${pct}%"></div></div></div>
-      ${plan !== 'premium' && !isOngMember() ? `<button class="btn-secondary" onclick="showPage('plans'); setPlanAudience('ong')">Ver planos</button>` : ''}
-    </div>`;
-}
-
-function lockHtml(text) {
-  return `<div class="compat-lock">🔒 ${text} <a href="#" onclick="showPage('plans'); setPlanAudience('ong'); return false;">Ver planos</a></div>`;
-}
-
-// ----- Chat entre ONG e adotador -----
-async function openRequestChat(requestId, petName, role) {
-  const { data: msgs } = await sb.from('request_messages').select('*').eq('request_id', requestId).order('created_at', { ascending: true });
-  const list = msgs || [];
-  const otherWrote = list.some(m => m.sender_id !== currentUser.id);
-  const canSend = role === 'ong' ? ['essencial', 'premium'].includes(ongPlan()) : otherWrote;
-  openPetToolModal(`
-    <h2>💬 Conversa sobre ${escapeHtml(petName)}</h2>
-    <div class="chat-box">${list.length ? list.map(m => `
-      <div class="chat-msg ${m.sender_id === currentUser.id ? 'mine' : ''}"><small>${m.sender_id === currentUser.id ? 'Você' : (role === 'ong' ? 'Adotador' : 'ONG')} • ${fmtDateTime(m.created_at)}</small><p>${escapeHtml(m.body)}</p></div>`).join('')
-      : '<p style="color:#888;">Nenhuma mensagem ainda.</p>'}</div>
-    ${canSend ? `<form onsubmit="sendRequestMessage(event, '${requestId}', ${jsStr(petName)}, '${role}')" class="chat-form">
-      <input type="text" id="chatInput" maxlength="1000" placeholder="Escreva sua mensagem" required><button class="btn-primary" type="submit">Enviar</button></form>`
-      : role === 'ong' ? lockHtml('Conversar com adotantes é do plano ONG Essencial ou Premium.') : '<p style="color:#888;">Você poderá responder depois que a ONG enviar uma mensagem.</p>'}`);
-}
-
-async function sendRequestMessage(e, requestId, petName, role) {
-  e.preventDefault();
-  const body = document.getElementById('chatInput').value.trim();
-  if (!body) return;
-  const { error } = await sb.from('request_messages').insert([{ request_id: requestId, sender_id: currentUser.id, body }]);
-  if (error) { alert('Não foi possível enviar: ' + error.message); return; }
-  if (role === 'ong') await createNotification(requestId, `Nova mensagem da ONG sobre ${petName}. Veja em Minhas Solicitações > Mensagens.`);
-  openRequestChat(requestId, petName, role);
-}
-
-// ----- Acompanhamento (Premium) -----
-async function openRequestNotes(requestId, petName) {
-  if (ongPlan() !== 'premium') { openPetToolModal(lockHtml('O histórico de acompanhamento é do plano ONG Premium.')); return; }
-  const { data: notes } = await sb.from('request_notes').select('*').eq('request_id', requestId).order('created_at', { ascending: false });
-  openPetToolModal(`
-    <h2>📋 Acompanhamento de ${escapeHtml(petName)}</h2>
-    <p style="color:#777; font-size:0.9rem;">Anotações internas: só a equipe da ONG vê.</p>
-    <form onsubmit="saveRequestNote(event, '${requestId}', ${jsStr(petName)})" class="chat-form">
-      <input type="text" id="noteInput" maxlength="1000" placeholder="Ex.: ligou para o adotante, casa visitada" required><button class="btn-primary" type="submit">Salvar</button></form>
-    ${(notes || []).length ? (notes || []).map(n => `<div class="diary-entry"><small>${fmtDateTime(n.created_at)}</small><p>${escapeHtml(n.note)}</p></div>`).join('') : '<p style="color:#888;">Nenhuma anotação ainda.</p>'}`);
-}
-
-async function saveRequestNote(e, requestId, petName) {
-  e.preventDefault();
-  const note = document.getElementById('noteInput').value.trim();
-  const { error } = await sb.from('request_notes').insert([{ request_id: requestId, author_id: currentUser.id, note }]);
-  if (error) { alert('Erro: ' + error.message); return; }
-  openRequestNotes(requestId, petName);
-}
-
-async function setVisitStatus(id, status) {
-  const { error } = await sb.from('visits').update({ status }).eq('id', id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  renderAdminVisits();
-}
-
-// ----- Divulgação: link próprio, cartão, Pix, modelos -----
-function ongPublicLink() {
-  return location.origin + location.pathname + '?ong=' + ongScopeId();
-}
-
-async function renderPromoTab() {
-  const el = document.getElementById('promoContent');
-  const plan = ongPlan();
-  const profile = ongScope ? ongScope.profile : currentUser;
-  const basic = ['essencial', 'premium'].includes(plan);
-  el.innerHTML = `
-    <div class="promo-box"><h3>Página própria da ONG</h3>
-    ${basic ? `<p>Compartilhe este link nas redes sociais: ele mostra a sua ONG e os pets disponíveis.</p>
-      <p><input type="text" readonly value="${escapeHtml(ongPublicLink())}" style="width:100%; padding:0.5rem;" onclick="this.select()"></p>
-      <button class="btn-secondary" onclick="copyText(${jsStr(ongPublicLink())})">Copiar link</button>
-      <button class="btn-secondary" onclick="showOngPublic('${ongScopeId()}')">Ver como fica</button>`
-      : lockHtml('A página própria da ONG é do plano Essencial ou Premium.')}</div>
-    <div class="promo-box"><h3>Cartão de divulgação</h3>
-    ${basic ? `<p>Uma imagem pronta para postar no Instagram ou WhatsApp.</p>
-      <select id="cardPetSelect"></select> <button class="btn-primary" onclick="makeShareCard()">Gerar imagem</button>
-      <div id="shareCardOut"></div>` : lockHtml('O cartão de divulgação é do plano Essencial ou Premium.')}</div>
-    <div class="promo-box"><h3>Pix para doações</h3>
-    ${plan === 'premium' && !isOngMember() ? `<p>Aparece na sua página pública e nos detalhes dos pets.</p>
-      <form onsubmit="savePix(event)" class="commerce-form">
-        <input type="text" id="pixKey" placeholder="Chave Pix" maxlength="140" value="${escapeHtml(profile.pix_key || '')}">
-        <input type="text" id="pixName" placeholder="Nome do recebedor" maxlength="80" value="${escapeHtml(profile.pix_name || '')}">
-        <button class="btn-primary" type="submit">Salvar</button></form>`
-      : plan === 'premium' ? '<p>Somente a conta principal da ONG altera o Pix.</p>' : lockHtml('Divulgar sua chave Pix é do plano ONG Premium.')}</div>
-    <div class="promo-box"><h3>Modelos de documentos</h3>
-    ${plan === 'premium' ? `<p>Baixe, edite no Word e use com os adotantes.</p>
-      <button class="btn-secondary" onclick="downloadTemplate('termo')">Termo de adoção</button>
-      <button class="btn-secondary" onclick="downloadTemplate('questionario')">Questionário de entrevista</button>`
-      : lockHtml('Modelos de termo e questionário são do plano ONG Premium.')}</div>`;
-  if (basic) {
-    const { data: pets } = await sb.from('pets').select('id, name').eq('ong_id', ongScopeId()).eq('status', 'available');
-    const sel = document.getElementById('cardPetSelect');
-    if (sel) sel.innerHTML = (pets || []).map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">Sem pets disponíveis</option>';
-  }
-}
-
-async function savePix(e) {
-  e.preventDefault();
-  const pix_key = document.getElementById('pixKey').value.trim() || null;
-  const pix_name = document.getElementById('pixName').value.trim() || null;
-  const { error } = await sb.from('profiles').update({ pix_key, pix_name }).eq('id', currentUser.id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  currentUser = { ...currentUser, pix_key, pix_name };
-  await loadOngScope();
-  alert('Pix salvo!');
-}
-
-function downloadTemplate(kind) {
-  const ong = escapeHtml((ongScope ? ongScope.profile : currentUser).name);
-  const docs = {
-    termo: ['Termo de adoção responsável', `<h1>Termo de Adoção Responsável</h1><p><b>ONG:</b> ${ong}</p><p><b>Adotante:</b> ________________________ <b>Documento:</b> ____________</p><p><b>Animal:</b> ________________________ <b>Espécie/Raça:</b> ____________</p><p>O adotante declara que:</p><ol><li>Oferecerá alimentação, água, abrigo e cuidados veterinários.</li><li>Não abandonará, venderá, doará ou maltratará o animal.</li><li>Manterá vacinas e vermifugação em dia e castrará o animal quando indicado.</li><li>Permitirá visitas de acompanhamento da ONG.</li><li>Devolverá o animal à ONG caso não possa mais cuidar dele.</li></ol><p>Data: ___/___/______</p><p>Assinatura do adotante: ______________________</p><p>Assinatura da ONG: ______________________</p>`],
-    questionario: ['Questionário de entrevista', `<h1>Questionário de Entrevista de Adoção</h1><p><b>ONG:</b> ${ong}</p><ol><li>Por que você quer adotar?</li><li>Já teve animais? O que aconteceu com eles?</li><li>Onde você mora (casa, apartamento, quintal, telas de proteção)?</li><li>Quantas pessoas moram com você? Todos concordam com a adoção?</li><li>Há crianças ou outros animais em casa?</li><li>Quantas horas o animal ficaria sozinho por dia?</li><li>Quem cuidará dele em viagens?</li><li>Você tem condições de arcar com ração, vacinas e consultas?</li></ol>`]
-  };
-  const [name, body] = docs[kind];
-  const blob = new Blob(['<html><head><meta charset="utf-8"></head><body style="font-family:Arial">' + body + '</body></html>'], { type: 'application/msword' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name + '.doc';
-  document.body.appendChild(a); a.click(); a.remove();
-}
-
-async function makeShareCard() {
-  const id = document.getElementById('cardPetSelect').value;
-  if (!id) { alert('Cadastre um pet disponível primeiro.'); return; }
-  const { data: pet } = await sb.from('pets').select('*').eq('id', id).single();
-  const ongName = (ongScope ? ongScope.profile : currentUser).name;
-  const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
-  const g = c.getContext('2d');
-  g.fillStyle = '#2f80ed'; g.fillRect(0, 0, 1080, 1080);
-  g.fillStyle = '#fff'; g.fillRect(40, 40, 1000, 1000);
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  const done = () => {
-    g.fillStyle = '#2f80ed'; g.font = 'bold 72px sans-serif'; g.textAlign = 'center';
-    g.fillText('Adote ' + pet.name + '!', 540, 760);
-    g.fillStyle = '#444'; g.font = '40px sans-serif';
-    g.fillText(`${TYPE_LABELS[pet.type] || ''} • ${SIZE_LABELS[pet.size] || ''} • ${pet.age} ano(s)`, 540, 830);
-    g.fillText(pet.city + ' • ' + ongName, 540, 890);
-    g.fillStyle = '#27ae60'; g.font = 'bold 44px sans-serif';
-    g.fillText('Adoção pelo PetMatch 🐾', 540, 970);
-    const url = c.toDataURL('image/png');
-    document.getElementById('shareCardOut').innerHTML = `<img src="${url}" style="max-width:100%; margin-top:1rem; border-radius:12px;"><br><a class="btn-primary" download="${escapeHtml(pet.name)}-petmatch.png" href="${url}">Baixar imagem</a>`;
-  };
-  img.onload = () => { g.drawImage(img, 80, 80, 920, 560); done(); };
-  img.onerror = () => { g.fillStyle = '#eef3fb'; g.fillRect(80, 80, 920, 560); g.fillStyle = '#2f80ed'; g.font = '200px sans-serif'; g.fillText('🐾', 540, 420); done(); };
-  img.src = safeImage(pet.image_url) || 'images/pet-dog-brown-1.png';
-}
-
-// Página pública da ONG (?ong=<id>)
-async function showOngPublic(ongId) {
-  showPage('ong-public');
-  const el = document.getElementById('ongPublicContent');
-  el.innerHTML = '<p style="color:#999;">Carregando...</p>';
-  const { data: ong } = await sb.from('profiles').select('id, name, city, address, phone, email, user_type, plan, plan_expires_at, pix_key, pix_name').eq('id', ongId).maybeSingle();
-  if (!ong || ong.user_type !== 'ong') { el.innerHTML = '<p>ONG não encontrada.</p>'; return; }
-  const [{ data: pets }, { data: evs }] = await Promise.all([
-    sb.from('pets').select('*').eq('ong_id', ongId).eq('status', 'available'),
-    sb.from('events').select('*').eq('ong_id', ongId).gte('event_date', new Date().toISOString()).order('event_date')
-  ]);
-  const plan = planOf(ong);
-  el.innerHTML = `
-    <h2>${escapeHtml(ong.name)} ${['essencial', 'premium'].includes(plan) ? '<span class="ong-verified">✔ ONG Verificada</span>' : ''}</h2>
-    <p>${escapeHtml(ong.city || '')}${ong.address ? ' • ' + escapeHtml(ong.address) : ''}${ong.phone ? ' • ' + escapeHtml(ong.phone) : ''}</p>
-    ${plan === 'premium' && ong.pix_key ? `<p>💚 Apoie a ONG via Pix: <code>${escapeHtml(ong.pix_key)}</code>${ong.pix_name ? ' (' + escapeHtml(ong.pix_name) + ')' : ''} <button class="btn-secondary" style="padding:2px 10px;" onclick="copyText(${jsStr(ong.pix_key)})">Copiar</button></p>` : ''}
-    ${(evs || []).length ? `<h3>Próximos eventos</h3>${evs.map(e => eventCardHtml(e)).join('')}` : ''}
-    <h3>Pets disponíveis (${(pets || []).length})</h3>
-    <div class="partners-grid">${(pets || []).map(p => `
-      <div class="partner-card product-card"><img src="${escapeHtml(safeImage(p.image_url) || 'images/pet-dog-brown-1.png')}" class="product-img" alt="">
-      <h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(TYPE_LABELS[p.type] || '')} • ${escapeHtml(p.age)} ano(s) • ${escapeHtml(p.city)}</p>
-      <button class="btn-primary" onclick="showPage('pets')">Ver na lista de pets</button></div>`).join('') || '<p style="color:#888;">Nenhum pet disponível agora.</p>'}</div>`;
-}
-
-// ----- Eventos (Premium cria; todos veem) -----
-function eventCardHtml(e) {
-  return `<div class="partner-card"><h3>📅 ${escapeHtml(e.title)}</h3>
-    <p><b>${fmtDateTime(e.event_date)}</b>${e.city ? ' • ' + escapeHtml(e.city) : ''}</p>
-    ${e.location ? `<p>📍 ${escapeHtml(e.location)} <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.location + ' ' + (e.city || ''))}" target="_blank" rel="noopener noreferrer">Ver no mapa</a></p>` : ''}
-    ${e.description ? `<p class="partner-desc">${escapeHtml(e.description)}</p>` : ''}</div>`;
-}
-
-async function loadEventsPage() {
-  const el = document.getElementById('eventsPublicList');
-  el.innerHTML = '<p style="color:#999; grid-column:1/-1;">Carregando...</p>';
-  const { data } = await sb.from('events').select('*').gte('event_date', new Date().toISOString()).order('event_date');
-  el.innerHTML = (data || []).map(eventCardHtml).join('') || '<p style="color:#999; grid-column:1/-1; text-align:center;">Nenhum evento marcado por enquanto.</p>';
-}
-
-async function renderOngEventsTab() {
-  const el = document.getElementById('ongEventsContent');
-  const premium = ongPlan() === 'premium';
-  const { data } = await sb.from('events').select('*').eq('ong_id', ongScopeId()).order('event_date', { ascending: false });
-  el.innerHTML = (premium ? `
-    <form onsubmit="saveEvent(event)" class="commerce-form">
-      <input type="text" id="evTitle" placeholder="Título (ex.: Feira de adoção)" maxlength="120" required>
-      <label class="commerce-check">Data e hora <input type="datetime-local" id="evDate" required></label>
-      <input type="text" id="evLocation" placeholder="Local" maxlength="160">
-      <input type="text" id="evCity" placeholder="Cidade" maxlength="80">
-      <input type="text" id="evDesc" placeholder="Descrição" maxlength="1000">
-      <button class="btn-primary" type="submit">Criar evento</button></form>` : lockHtml('Criar eventos é do plano ONG Premium.')) +
-    ((data || []).map(e => `<div class="commerce-row"><div><b>${escapeHtml(e.title)}</b><br><small>${fmtDateTime(e.event_date)}${e.city ? ' • ' + escapeHtml(e.city) : ''}</small></div>
-      <button class="btn-secondary" style="color:#c0392b;" onclick="deleteEvent('${e.id}')">Apagar</button></div>`).join('') || '<p style="color:#888;">Nenhum evento criado.</p>');
-}
-
-async function saveEvent(e) {
-  e.preventDefault();
-  const row = {
-    ong_id: ongScopeId(),
-    title: document.getElementById('evTitle').value.trim(),
-    event_date: new Date(document.getElementById('evDate').value).toISOString(),
-    location: document.getElementById('evLocation').value.trim() || null,
-    city: document.getElementById('evCity').value.trim() || null,
-    description: document.getElementById('evDesc').value.trim() || null
-  };
-  const { error } = await sb.from('events').insert([row]);
-  if (error) { alert('Erro: ' + error.message); return; }
-  renderOngEventsTab();
-}
-
-async function deleteEvent(id) {
-  if (!confirm('Apagar este evento?')) return;
-  const { error } = await sb.from('events').delete().eq('id', id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  renderOngEventsTab();
-}
-
-// ----- Relatórios (básico no Essencial, completo no Premium) -----
-async function renderReportsTab() {
-  const el = document.getElementById('reportsContent');
-  const plan = ongPlan();
-  if (!['essencial', 'premium'].includes(plan)) { el.innerHTML = lockHtml('Estatísticas são dos planos ONG Essencial e Premium.'); return; }
-  el.innerHTML = '<p style="color:#999;">Carregando...</p>';
-  const ongId = ongScopeId();
-  const [{ data: pets }, { data: reqs }] = await Promise.all([
-    sb.from('pets').select('id, name, status, created_at').eq('ong_id', ongId),
-    sb.from('adoption_requests').select('id, status, created_at, pet_id, pets!inner(name, ong_id)').eq('pets.ong_id', ongId)
-  ]);
-  const P = pets || [], R = reqs || [];
-  const by = s => R.filter(r => r.status === s).length;
-  const adopted = P.filter(p => p.status === 'adopted').length;
-  const conv = R.length ? Math.round(by('completed') / R.length * 100) : 0;
-  let html = `<div class="dashboard-stats">
-    <div class="stat-card"><h4>Pets cadastrados</h4><p class="stat-number">${P.length}</p></div>
-    <div class="stat-card"><h4>Pets adotados</h4><p class="stat-number">${adopted}</p></div>
-    <div class="stat-card"><h4>Solicitações</h4><p class="stat-number">${R.length}</p></div>
-    <div class="stat-card"><h4>Taxa de adoção</h4><p class="stat-number">${conv}%</p></div></div>`;
-  if (plan !== 'premium') {
-    el.innerHTML = html + lockHtml('Relatórios completos, painel de desempenho e exportação são do plano ONG Premium.');
-    return;
-  }
-  const perPet = P.map(p => {
-    const rs = R.filter(r => r.pet_id === p.id);
-    return { name: p.name, status: p.status, requests: rs.length, completed: rs.filter(r => r.status === 'completed').length, days: daysSince(p.created_at) };
-  }).sort((a, b) => b.requests - a.requests);
-  const months = {};
-  R.forEach(r => { const k = r.created_at.slice(0, 7); months[k] = (months[k] || 0) + 1; });
-  const max = Math.max(1, ...Object.values(months));
-  html += `<h3>Funil de adoção</h3><div class="commerce-row"><span>Pendentes: <b>${by('pending')}</b></span><span>Aprovadas: <b>${by('approved')}</b></span><span>Visita marcada: <b>${by('visit_scheduled')}</b></span><span>Concluídas: <b>${by('completed')}</b></span><span>Rejeitadas: <b>${by('rejected')}</b></span></div>
-    <h3>Solicitações por mês</h3>${Object.keys(months).sort().map(k => `<div class="bar-row"><span>${k}</span><div class="adapt-bar" style="flex:1"><div style="width:${months[k] / max * 100}%"></div></div><b>${months[k]}</b></div>`).join('') || '<p style="color:#888;">Sem dados ainda.</p>'}
-    <h3>Desempenho por pet</h3><table class="log-table"><tr><th>Pet</th><th>Situação</th><th>Solicitações</th><th>Adoções</th><th>Dias no site</th></tr>
-    ${perPet.map(x => `<tr><td>${escapeHtml(x.name)}</td><td>${escapeHtml(x.status)}</td><td>${x.requests}</td><td>${x.completed}</td><td>${x.days}</td></tr>`).join('')}</table>
-    <button class="btn-primary" style="margin-top:1rem;" onclick='exportReportCsv(${JSON.stringify(JSON.stringify(perPet)).replace(/'/g, "&#39;")})'>Baixar relatório (CSV)</button>`;
-  el.innerHTML = html;
-}
-
-function exportReportCsv(json) {
-  const rows = JSON.parse(json);
-  const csv = ['Pet,Situação,Solicitações,Adoções,Dias no site'].concat(rows.map(r => [r.name, r.status, r.requests, r.completed, r.days].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','))).join('\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'relatorio-petmatch.csv';
-  document.body.appendChild(a); a.click(); a.remove();
-}
-
-// ----- Equipe (Premium) -----
-async function renderTeamTab() {
-  const el = document.getElementById('teamContent');
-  if (isOngMember()) { el.innerHTML = `<p>Você é administrador da ONG <b>${escapeHtml(ongScope.profile.name)}</b>. Você pode <button class="btn-secondary" onclick="leaveOngTeam()">sair da equipe</button>.</p>`; return; }
-  if (ongPlan() !== 'premium') { el.innerHTML = lockHtml('Mais de um administrador é do plano ONG Premium.'); return; }
-  const { data: members } = await sb.from('ong_members').select('id, member_id').eq('ong_id', currentUser.id);
-  const ids = (members || []).map(m => m.member_id);
-  const { data: profs } = ids.length ? await sb.from('profiles').select('id, name, email').in('id', ids) : { data: [] };
-  const byId = Object.fromEntries((profs || []).map(p => [p.id, p]));
-  el.innerHTML = `<p>Até 5 administradores extras. Eles precisam ter uma conta de ONG no PetMatch.</p>
-    <form onsubmit="addTeamMember(event)" class="commerce-form"><input type="email" id="teamEmail" placeholder="E-mail do administrador" required><button class="btn-primary" type="submit">Adicionar</button></form>` +
-    ((members || []).map(m => `<div class="commerce-row"><div><b>${escapeHtml((byId[m.member_id] || {}).name || 'Administrador')}</b><br><small>${escapeHtml((byId[m.member_id] || {}).email || '')}</small></div>
-      <button class="btn-secondary" style="color:#c0392b;" onclick="removeTeamMember('${m.id}')">Remover</button></div>`).join('') || '<p style="color:#888;">Nenhum administrador extra.</p>');
-}
-
-async function addTeamMember(e) {
-  e.preventDefault();
-  const { error } = await sb.rpc('add_ong_member', { p_email: document.getElementById('teamEmail').value });
-  if (error) { alert(error.message); return; }
-  renderTeamTab();
-}
-async function removeTeamMember(id) {
-  if (!confirm('Remover este administrador?')) return;
-  const { error } = await sb.from('ong_members').delete().eq('id', id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  renderTeamTab();
-}
-async function leaveOngTeam() {
-  if (!confirm('Sair da equipe desta ONG?')) return;
-  const { error } = await sb.from('ong_members').delete().eq('member_id', currentUser.id);
-  if (error) { alert('Erro: ' + error.message); return; }
-  await loadOngScope();
-  switchAdminTab('dashboard');
-}
-
-// Link ?ong=<id> abre a página pública da ONG
-document.addEventListener('DOMContentLoaded', () => {
-  const id = new URLSearchParams(location.search).get('ong');
-  if (id && /^[0-9a-f-]{36}$/i.test(id)) setTimeout(() => showOngPublic(id), 400);
-});
-
-
 // ============================================================================
 // PREFEITURA e EMPRESA: painel próprio
 // ============================================================================
-const PLAN_FOR_ROLE_ADMIN = {
-  adopter: ['free', 'plus'], ong: ['free', 'essencial', 'premium'],
-  prefeitura: ['free', 'institucional'], empresa: ['free', 'parceira']
-};
-
-async function adminChangePlan(userId, plan) {
-  const { error } = await sb.rpc('admin_set_plan', { p_user: userId, p_plan: plan });
-  if (error) { alert('Erro: ' + error.message); renderAdminUsersList(); return; }
-  alert('Plano alterado.');
-}
 
 const STATUS_CONTENT = { pending: ['⏳ Em análise', '#d9822b'], approved: ['✔ Publicado', 'var(--primary-green)'], rejected: ['✖ Recusado', '#c0392b'] };
 function statusBadge(s) {
@@ -3843,31 +3035,21 @@ async function saveOwnAd(e, kind) {
 async function loadOrgPanel() {
   const el = document.getElementById('orgPanelContent');
   const role = currentUser.user_type;
-  const plan = planOf(currentUser);
   document.getElementById('orgPanelTitle').textContent = role === 'prefeitura' ? 'Painel da Prefeitura' : 'Painel da Empresa';
   el.innerHTML = '<p style="color:#999;">Carregando...</p>';
   const mine = async table => (await sb.from(table).select('*').eq('owner_id', currentUser.id).order('created_at', { ascending: false })).data || [];
-  const head = `<div class="ong-banner"><div><b>Plano: ${escapeHtml(PLAN_LABELS[plan] || plan)}</b><br><small>${role === 'prefeitura'
-      ? (plan === 'institucional' ? 'Até 50 anúncios e indicadores do município.' : 'Até 2 anúncios. O plano institucional libera mais anúncios e indicadores.')
-      : (plan === 'parceira' ? 'Até 5 empresas, 30 produtos e 10 anúncios.' : 'Até 1 empresa e 3 produtos. A Empresa Parceira libera anúncios, mais itens e destaque.')}</small></div>
-      <button class="btn-secondary" onclick="showPage('my-plan')">Meu plano</button></div>
-    <p class="compat-lock" style="background:#f2f7ff; border-color:#cfe0fb; color:#245;">Tudo o que você publica passa por aprovação do Supervisor ou do Administrador antes de aparecer no site.</p>`;
+  const head = `<p class="compat-lock" style="background:#f2f7ff; border-color:#cfe0fb; color:#245;">Tudo o que você publica passa por aprovação do Supervisor ou do Administrador antes de aparecer no site.</p>`;
 
   if (role === 'prefeitura') {
     const ads = await mine('ads');
-    let stats = '';
-    if (plan === 'institucional') {
-      const { data, error } = await sb.rpc('city_stats', { p_city: currentUser.city });
-      stats = error ? `<p class="compat-lock">${escapeHtml(error.message)}</p>` : `<h3>Indicadores de ${escapeHtml(data.city)}</h3><div class="dashboard-stats">
-        <div class="stat-card"><h4>Pets disponíveis</h4><p class="stat-number">${data.pets_available}</p></div>
-        <div class="stat-card"><h4>Pets adotados</h4><p class="stat-number">${data.pets_adopted}</p></div>
-        <div class="stat-card"><h4>ONGs na cidade</h4><p class="stat-number">${data.ongs}</p></div>
-        <div class="stat-card"><h4>Adotadores</h4><p class="stat-number">${data.adopters}</p></div>
-        <div class="stat-card"><h4>Solicitações</h4><p class="stat-number">${data.requests}</p></div>
-        <div class="stat-card"><h4>Adoções concluídas</h4><p class="stat-number">${data.completed}</p></div></div>`;
-    } else {
-      stats = lockHtml('Os indicadores do município são do plano institucional.');
-    }
+    const { data, error } = await sb.rpc('city_stats', { p_city: currentUser.city });
+    const stats = error ? `<p class="compat-lock">${escapeHtml(error.message)}</p>` : `<h3>Indicadores de ${escapeHtml(data.city)}</h3><div class="dashboard-stats">
+      <div class="stat-card"><h4>Pets disponíveis</h4><p class="stat-number">${data.pets_available}</p></div>
+      <div class="stat-card"><h4>Pets adotados</h4><p class="stat-number">${data.pets_adopted}</p></div>
+      <div class="stat-card"><h4>ONGs na cidade</h4><p class="stat-number">${data.ongs}</p></div>
+      <div class="stat-card"><h4>Adotadores</h4><p class="stat-number">${data.adopters}</p></div>
+      <div class="stat-card"><h4>Solicitações</h4><p class="stat-number">${data.requests}</p></div>
+      <div class="stat-card"><h4>Adoções concluídas</h4><p class="stat-number">${data.completed}</p></div></div>`;
     const { data: ongs } = currentUser.city ? await sb.from('profiles').select('id, name, phone').eq('user_type', 'ong').ilike('city', currentUser.city) : { data: [] };
     el.innerHTML = head + stats + `<h3>ONGs da cidade</h3>` + ((ongs || []).map(o => `<div class="commerce-row"><div><b>${escapeHtml(o.name)}</b><br><small>${escapeHtml(o.phone || '')}</small></div><button class="btn-secondary" onclick="showOngPublic('${o.id}')">Ver página</button></div>`).join('') || '<p style="color:#888;">Nenhuma ONG cadastrada na sua cidade.</p>') +
       `<h3>Novo anúncio (campanhas, castração, vacinação)</h3>` + adFormHtml('prefeitura') +
@@ -3889,9 +3071,8 @@ async function loadOrgPanel() {
       <input type="text" id="opAddress" placeholder="Endereço">
       <input type="text" id="opPhone" placeholder="Telefone">
       <input type="text" id="opDesc" placeholder="Descrição curta" maxlength="300">
-      <input type="number" id="opDiscount" placeholder="Desconto para Adotador Plus (%)" min="0" max="50">
       <button class="btn-primary" type="submit">Enviar para aprovação</button></form>
-    ${partners.map(x => ownRow('partners', x, x.name, `${PARTNER_CATEGORIES[x.category] || ''} • ${x.city} • 👁 ${x.views || 0} visualizações${x.plus_discount ? ' • ' + x.plus_discount + '% Plus' : ''}`)).join('')}
+    ${partners.map(x => ownRow('partners', x, x.name, `${PARTNER_CATEGORIES[x.category] || ''} • ${x.city} • 👁 ${x.views || 0} visualizações`)).join('')}
     <h3>Meus produtos na loja</h3>
     <form onsubmit="saveOwnProduct(event)" class="commerce-form">
       <input type="text" id="oprName" placeholder="Nome do produto" required maxlength="120">
@@ -3903,7 +3084,7 @@ async function loadOrgPanel() {
       <button class="btn-primary" type="submit">Enviar para aprovação</button></form>
     ${products.map(x => ownRow('products', x, x.name, `${PRODUCT_CATEGORIES[x.category] || ''} • ${formatPrice(x.price)}`)).join('')}
     <h3>Meus anúncios</h3>
-    ${plan === 'parceira' ? adFormHtml('empresa') : lockHtml('Anúncios são da Empresa Parceira.')}
+    ${adFormHtml('empresa')}
     ${ads.map(x => ownRow('ads', x, x.title, `👁 ${x.views || 0} visualizações • 👆 ${x.clicks || 0} cliques`)).join('')}`;
 }
 
@@ -3914,12 +3095,10 @@ async function saveOwnPartner(e) {
   if (cep && cep.length !== 8) { alert('O CEP deve ter 8 números.'); return; }
   const la = val('opLat'), lo = val('opLng');
   if ((la === '') !== (lo === '')) { alert('Preencha latitude e longitude juntas.'); return; }
-  const disc = val('opDiscount') === '' ? null : parseInt(val('opDiscount'), 10);
-  if (disc !== null && (isNaN(disc) || disc < 0 || disc > 50)) { alert('O desconto vai de 0 a 50%.'); return; }
   const row = { name: val('opName'), category: val('opCategory'), city: val('opCity'), cep: cep || null,
     latitude: la === '' ? null : parseFloat(la), longitude: lo === '' ? null : parseFloat(lo),
     address: val('opAddress') || null, phone: val('opPhone') || null, description: val('opDesc') || null,
-    plus_discount: disc || null, owner_id: currentUser.id };
+    owner_id: currentUser.id };
   const { error } = await sb.from('partners').insert([row]);
   if (error) { alert('Não foi possível enviar: ' + error.message); return; }
   alert('Enviado! Aparece no site depois da aprovação.');
@@ -3964,19 +3143,15 @@ async function reviewContent(table, id, status) {
 
 async function renderOverview() {
   const el = document.getElementById('overviewContent');
-  const isAdmin = currentUser.user_type === 'admin';
   el.innerHTML = '<p style="color:#999;">Carregando...</p>';
   const { data, error } = await sb.rpc('admin_overview');
   if (error) { el.innerHTML = `<p class="compat-lock">${escapeHtml(error.message)}</p>`; return; }
   const card = (h, n) => `<div class="stat-card"><h4>${h}</h4><p class="stat-number">${n}</p></div>`;
-  const users = data.users || {}, plans = data.plans || {};
+  const users = data.users || {};
   el.innerHTML = `<div class="dashboard-stats">
     ${card('Adotadores', users.adopter || 0)}${card('ONGs', users.ong || 0)}${card('Prefeituras', users.prefeitura || 0)}${card('Empresas', users.empresa || 0)}
-    ${card('Pets', data.pets)}${card('Solicitações', data.requests)}${card('Adoções concluídas', data.completed)}${card('Conteúdos para aprovar', data.pending_content)}</div>
-    <h3>Assinaturas ativas por plano</h3><div class="dashboard-stats">${Object.keys(plans).filter(k => k !== 'free').map(k => card(escapeHtml(PLAN_LABELS[k] || k), plans[k])).join('') || '<p style="color:#888;">Nenhuma assinatura ainda.</p>'}</div>
-    ${isAdmin ? `<h3>Receita das assinaturas ativas</h3><p class="stat-number">${formatPrice(data.revenue || 0)}</p><small style="color:#888;">Pagamento simulado nesta versão: o valor mostra o que seria cobrado.</small>` : ''}`;
+    ${card('Pets', data.pets)}${card('Solicitações', data.requests)}${card('Adoções concluídas', data.completed)}${card('Conteúdos para aprovar', data.pending_content)}</div>`;
 }
-
 
 // ============================================================================
 // RECUPERAÇÃO DE SENHA
@@ -4055,7 +3230,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
 
 // ----- Alterar senha (usuário logado) -----
 function openChangePassword() {
