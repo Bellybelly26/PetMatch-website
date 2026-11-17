@@ -18,11 +18,9 @@
         </div>
         <nav class="nav">
           <a href="#" onclick="showPage('home')">Início</a>
-          <a href="#" onclick="showPage('pets')">Pets</a>
           <a href="#" onclick="showPage('about')">Sobre</a>
           <a href="#" onclick="showPage('partners')">Parceiros</a>
           <a href="#" onclick="showPage('shop')">Loja</a>
-          <a href="#" onclick="showPage('plans')">Planos</a>
           <a href="#" onclick="showPage('help')">Ajuda</a>
         </nav>
         <div class="header-actions">
@@ -49,9 +47,7 @@
       <div id="profileRoleLabel" style="padding:0.5rem 1rem; font-size:0.8rem; opacity:0.85; font-weight:bold;"></div>
       <a href="#" onclick="showPage('adopter-profile')">Meu Perfil</a>
       <a href="#" id="myRequestsLink" onclick="showPage('my-requests')">Minhas Solicitações</a>
-      <a href="#" id="myPetsLink" onclick="showPage('my-pets')" style="display:none;">🐶 Meus Pets</a>
       <a href="#" id="compatLink" onclick="showPage('compat')" style="display:none;">💚 Compatibilidade</a>
-      <a href="#" id="myPlanLink" onclick="showPage('my-plan')" style="display:none;">💳 Meu Plano</a>
       <a href="#" id="orgPanelLink" onclick="showPage('org-panel')" style="display:none;">Meu Painel</a>
       <a href="#" onclick="showPage('two-factor')">🔒 Verificação em Duas Etapas</a>
       <a href="#" onclick="openChangePassword(); return false;">🔑 Alterar senha</a>
@@ -78,20 +74,19 @@
           </div>
         </section>
 
-        <!-- ANÚNCIOS -->
-        <section class="ads-strip" aria-label="Anúncios e campanhas"></section>
-
-        <!-- EXPLORAR PETS -->
-        <section class="explore-section">
-          <h2>Explorar Pets</h2>
-          <p class="section-sub">Conheça alguns dos animais que estão esperando por uma família.</p>
-          <div class="pets-grid" id="homePetsGrid"></div>
-          <button class="btn-primary" style="margin-top:2rem;" onclick="showPage('pets')">Ver todos os pets</button>
-        </section>
-
+        <!-- SOBRE (no início da página) -->
+        <section class="home-about" id="homeAbout">
+          <p class="home-about-kicker">Sobre o PetMatch</p>
+          <h2>E se o melhor amigo da sua vida já estivesse esperando por você?</h2>
+          <p class="home-about-lead">O PetMatch conecta animais que precisam de um lar com famílias que querem adotar, de um jeito seguro, transparente e responsável.</p>
+          <div class="home-about-cards">
+            <div class="home-about-card"><span>🔎</span><b>Encontre o pet certo</b><p>Filtre por tipo, porte e cidade e veja o quanto cada pet combina com você.</p></div>
+            <div class="home-about-card"><span>🛡️</span><b>Adoção com segurança</b><p>ONGs cadastradas, histórico de cada pedido e contas verificadas.</p></div>
+            <div class="home-about-card"><span>🏡</span><b>Do primeiro clique ao novo lar</b><p>Você acompanha cada etapa, da solicitação até a adoção concluída.</p></div>
+          </div>
         <!-- ANIMAÇÃO: DO PRIMEIRO CLIQUE AO NOVO LAR -->
-        <section class="journey-section">
-          <h2>Do primeiro clique ao novo lar</h2>
+        <div class="journey-section home-journey">
+          <h3>Do primeiro clique ao novo lar</h3>
           <div class="journey" role="img" aria-label="Animação mostrando as etapas da adoção: explorar, solicitar, visita e adoção">
             <div class="journey-track"><div class="journey-pet"><span>🐕</span></div></div>
             <div class="journey-steps">
@@ -101,6 +96,23 @@
               <div class="journey-step s4"><span class="journey-icon">❤️</span><b>Adoção</b><small>Um novo lar</small></div>
             </div>
           </div>
+        </div>
+
+          <div class="home-about-actions">
+            <button class="btn-primary" onclick="showPage('pets')">Quero adotar</button>
+            <button class="btn-secondary" onclick="showPage('about')">Conheça o projeto</button>
+          </div>
+        </section>
+
+        <!-- ANÚNCIOS -->
+        <section class="ads-strip" aria-label="Anúncios e campanhas"></section>
+
+        <!-- EXPLORAR PETS -->
+        <section class="explore-section">
+          <h2>Explorar Pets</h2>
+          <p class="section-sub">Conheça alguns dos animais que estão esperando por uma família.</p>
+          <div class="pets-grid" id="homePetsGrid"></div>
+          <button class="btn-primary" style="margin-top:2rem;" onclick="showPage('pets')">Ver todos os pets</button>
         </section>
 
         <!-- STATS -->
@@ -422,13 +434,8 @@
             <button class="admin-tab-btn active" onclick="switchAdminTab('dashboard')">Dashboard</button>
             <button class="admin-tab-btn" onclick="switchAdminTab('pets')">Gerenciar Pets</button>
             <button class="admin-tab-btn" onclick="switchAdminTab('requests')">Solicitações</button>
-            <button class="admin-tab-btn" onclick="switchAdminTab('visits')">Visitas e Entrevistas</button>
-            <button class="admin-tab-btn" onclick="switchAdminTab('promo')">Divulgação</button>
-            <button class="admin-tab-btn" onclick="switchAdminTab('events')">Eventos</button>
-            <button class="admin-tab-btn" onclick="switchAdminTab('reports')">Relatórios</button>
-            <button class="admin-tab-btn" onclick="switchAdminTab('team')">Equipe</button>
+            <button class="admin-tab-btn" onclick="switchAdminTab('visits')">Visitas Agendadas</button>
           </div>
-          <div id="ongPlanBanner"></div>
 
           <!-- Dashboard Tab -->
           <div id="admin-dashboard" class="admin-tab active">
@@ -467,11 +474,6 @@
           <div id="admin-visits" class="admin-tab">
             <div id="visitsList" class="visits-list"></div>
           </div>
-
-          <div id="admin-promo" class="admin-tab"><div id="promoContent"></div></div>
-          <div id="admin-events" class="admin-tab"><div id="ongEventsContent"></div></div>
-          <div id="admin-reports" class="admin-tab"><div id="reportsContent"></div></div>
-          <div id="admin-team" class="admin-tab"><div id="teamContent"></div></div>
         </div>
       </div>
 
@@ -531,8 +533,7 @@
               <input type="text" id="cpAddress" placeholder="Endereço">
               <input type="text" id="cpPhone" placeholder="Telefone">
               <input type="text" id="cpDescription" placeholder="Descrição curta">
-              <input type="number" id="cpDiscount" placeholder="Desconto para Adotador Plus (%)" min="0" max="50">
-              <label class="commerce-check"><input type="checkbox" id="cpFeatured"> Plano destaque (aparece primeiro)</label>
+              <label class="commerce-check"><input type="checkbox" id="cpFeatured"> Em destaque (aparece primeiro)</label>
               <button class="btn-primary" type="submit">Adicionar parceiro</button>
             </form>
             <div id="commercePartnersList"></div>
@@ -650,45 +651,52 @@
             <small id="geoStatus">O navegador vai perguntar se você permite. A localização é usada só para calcular a distância e não é guardada.</small>
           </div>
           <div id="partnersGrid" class="partners-grid"></div>
-          <p class="plans-note">Quer aparecer aqui com destaque? Veja o plano <a href="#" onclick="showPage('plans');return false;">Empresa Parceira</a>.</p>
         </div>
       </div>
 
       <!-- SHOP PAGE -->
       <div id="page-shop" class="page">
-        <div class="partners-container">
-          <h2>Lojinha PetMatch</h2>
-          <p class="plans-lead">Tudo para o seu novo amigo: caminhas, roupinhas, coleiras e brinquedos.</p>
+        <div class="partners-container shop-wrap">
+          <section class="shop-hero">
+            <h2>Lojinha PetMatch</h2>
+            <p>Tudo para o seu novo amigo chegar em casa feliz.</p>
+            <div class="shop-perks">
+              <span>🚚 Frete grátis acima de R$ 150</span>
+              <span>🎟️ Cupom <b>PETMATCH10</b>: 10% off</span>
+              <span>🐾 Escolha por pet e por tamanho</span>
+            </div>
+          </section>
           <div class="shop-bar">
-            <input type="search" id="shopSearch" placeholder="🔍 Buscar produtos" oninput="renderShop()">
+            <input type="search" id="shopSearch" placeholder="🔍 O que você procura?" oninput="renderShop()">
             <select id="shopSort" onchange="renderShop()">
-              <option value="new">Mais recentes</option>
+              <option value="new">Novidades</option>
               <option value="low">Menor preço</option>
               <option value="high">Maior preço</option>
               <option value="az">Nome (A-Z)</option>
             </select>
-            <button type="button" class="btn-primary shop-cart-btn" onclick="openCart()">🛒 Carrinho (<span id="cartBadge">0</span>)</button>
           </div>
+          <div class="shop-filter-label">Para quem?</div>
+          <div class="shop-cats" id="shopSpecies">
+            <button type="button" class="active" data-sp="" onclick="setShopSpecies('')">Todos</button>
+            <button type="button" data-sp="cães" onclick="setShopSpecies('cães')">🐶 Cães</button>
+            <button type="button" data-sp="gatos" onclick="setShopSpecies('gatos')">🐱 Gatos</button>
+            <button type="button" data-sp="coelhos" onclick="setShopSpecies('coelhos')">🐰 Coelhos</button>
+            <button type="button" data-sp="pássaros" onclick="setShopSpecies('pássaros')">🐦 Pássaros</button>
+          </div>
+          <div class="shop-filter-label">Categoria</div>
           <div class="shop-cats" id="shopCats">
             <button type="button" class="active" data-cat="" onclick="setShopCategory('')">Tudo</button>
             <button type="button" data-cat="caminha" onclick="setShopCategory('caminha')">🛏️ Caminhas</button>
             <button type="button" data-cat="roupa" onclick="setShopCategory('roupa')">👕 Roupas</button>
-            <button type="button" data-cat="coleira" onclick="setShopCategory('coleira')">🦮 Coleiras</button>
+            <button type="button" data-cat="coleira" onclick="setShopCategory('coleira')">🦮 Coleiras e guias</button>
             <button type="button" data-cat="brinquedo" onclick="setShopCategory('brinquedo')">🎾 Brinquedos</button>
+            <button type="button" data-cat="outro" onclick="setShopCategory('outro')">🧴 Higiene, comida e mais</button>
+            <button type="button" data-cat="fav" onclick="setShopCategory('fav')">♥ Favoritos</button>
           </div>
+          <div id="shopCount" class="shop-count"></div>
           <div id="shopGrid" class="partners-grid"></div>
           <p class="plans-note">Compra simulada (projeto acadêmico): você monta o carrinho e finaliza o pedido, mas nenhum pagamento é feito.</p>
-        </div>
-      </div>
-
-      <!-- MY PETS PAGE (Adotador Plus) -->
-      <div id="page-my-pets" class="page">
-        <div class="partners-container">
-          <h2>Meus Pets</h2>
-          <p class="plans-lead">Os pets que você adotou pelo PetMatch: carteirinha digital, saúde, lembretes e diário de evolução.</p>
-          <div id="myPetsLock"></div>
-          <div id="myPetsReminders"></div>
-          <div id="myPetsContent" class="partners-grid"></div>
+          <button type="button" class="cart-fab" id="cartFab" onclick="openCart()" aria-label="Abrir carrinho">🛒 <span id="cartBadge">0</span> <span id="cartFabTotal"></span></button>
         </div>
       </div>
 
@@ -707,20 +715,6 @@
               <label>Energia
                 <select id="cpEnergy"><option value="">Qualquer</option><option value="Baixa">Baixa</option><option value="Moderada">Moderada</option><option value="Alta">Alta</option></select></label>
             </div>
-            <h3>Sua rotina e sua casa <span class="plan-tag plan-tag-plus">Plus</span></h3>
-            <div id="compatLock"></div>
-            <div class="compat-grid">
-              <label>Onde você mora
-                <select id="cpHome"><option value="">Não informar</option><option value="apto">Apartamento</option><option value="casa">Casa sem quintal</option><option value="quintal">Casa com quintal</option></select></label>
-              <label>Tempo livre por dia com o pet
-                <select id="cpHours"><option value="">Não informar</option><option value="pouco">Menos de 2 horas</option><option value="medio">De 2 a 5 horas</option><option value="muito">Mais de 5 horas</option></select></label>
-              <label>Experiência com pets
-                <select id="cpExp"><option value="">Não informar</option><option value="primeira">Primeiro pet</option><option value="alguma">Alguma experiência</option><option value="experiente">Bastante experiência</option></select></label>
-              <label>Crianças em casa
-                <select id="cpKids"><option value="">Não informar</option><option value="sim">Sim</option><option value="nao">Não</option></select></label>
-              <label>Outros animais em casa
-                <select id="cpOther"><option value="">Não informar</option><option value="sim">Sim</option><option value="nao">Não</option></select></label>
-            </div>
             <button class="btn-primary" type="submit">Salvar preferências</button>
           </form>
         </div>
@@ -731,30 +725,6 @@
         <div class="partners-container">
           <h2 id="orgPanelTitle">Meu Painel</h2>
           <div id="orgPanelContent" style="text-align:left;"></div>
-        </div>
-      </div>
-
-      <!-- EVENTS PAGE -->
-      <div id="page-events" class="page">
-        <div class="partners-container">
-          <h2>Eventos de adoção</h2>
-          <p class="plans-lead">Feiras, mutirões e encontros divulgados pelas ONGs Premium.</p>
-          <div id="eventsPublicList" class="partners-grid"></div>
-        </div>
-      </div>
-
-      <!-- ONG PUBLIC PAGE -->
-      <div id="page-ong-public" class="page">
-        <div class="partners-container">
-          <div id="ongPublicContent"></div>
-        </div>
-      </div>
-
-      <!-- MY PLAN PAGE -->
-      <div id="page-my-plan" class="page">
-        <div class="partners-container">
-          <h2>Meu Plano</h2>
-          <div id="myPlanContent" style="text-align:left;"></div>
         </div>
       </div>
 
@@ -769,38 +739,36 @@
               <ul>
                 <li>Cria conta e perfil, com fotos da casa</li>
                 <li>Explora pets e filtra por tipo, porte, cidade e CEP</li>
-                <li>Favorita pets e vê a compatibilidade básica</li>
+                <li>Favorita pets e vê a compatibilidade com o que procura</li>
                 <li>Pede adoção e acompanha cada etapa, com histórico</li>
-                <li>Recebe notificações e conversa com a ONG</li>
+                <li>Recebe notificações sobre o pedido</li>
+                <li>Vê parceiros perto de si e compra na lojinha</li>
                 <li>Pede ajuda, reclama e gerencia os próprios dados (LGPD)</li>
-                <li>Vê parceiros perto de si e a lojinha</li>
-                <li><b>Plus:</b> compatibilidade avançada, Meus Pets (carteirinha, saúde, lembretes, diário e pós-adoção), selo, pets novos primeiro, descontos, sem anúncios e suporte prioritário</li>
               </ul>
             </div>
             <div class="role-card">
               <h3>🏢 ONG <small>Usuário</small></h3>
               <ul>
-                <li>Cadastra, edita e remove pets (limite conforme o plano)</li>
+                <li>Cadastra, edita e remove pets, com fotos e vídeo</li>
                 <li>Recebe solicitações: aprova, rejeita, agenda visita e conclui a adoção</li>
                 <li>Vê o perfil do adotador e o histórico de cada pedido</li>
-                <li><b>Essencial:</b> mensagens com adotantes, estatísticas, selo ONG Verificada, link próprio e card de divulgação</li>
-                <li><b>Premium:</b> relatórios, painel de desempenho, entrevistas, acompanhamento dos adotantes, pets em destaque, equipe, Pix, modelos de documentos e eventos de adoção</li>
+                <li>Acompanha estatísticas no dashboard</li>
               </ul>
             </div>
             <div class="role-card">
               <h3>🏛️ Prefeitura <small>Usuário</small></h3>
               <ul>
                 <li>Publica campanhas, como castração gratuita e vacinação (passam por aprovação)</li>
-                <li>Vê as ONGs da própria cidade</li>
-                <li><b>Institucional:</b> mais anúncios, indicadores do município e desempenho das campanhas (liberado pelo Administrador após proposta)</li>
+                <li>Vê as ONGs da própria cidade e os indicadores do município</li>
+                <li>Acompanha visualizações e cliques dos anúncios</li>
               </ul>
             </div>
             <div class="role-card">
               <h3>🏪 Empresa <small>Usuário</small></h3>
               <ul>
                 <li>Cadastra a empresa em Parceiros e produtos na lojinha (passam por aprovação)</li>
-                <li>Define desconto para quem tem Adotador Plus</li>
-                <li><b>Empresa Parceira:</b> mais cadastros, destaque no topo, anúncios e relatório de visualizações e cliques</li>
+                <li>Publica anúncios, também com aprovação</li>
+                <li>Acompanha visualizações e cliques</li>
               </ul>
             </div>
             <div class="role-card">
@@ -808,163 +776,19 @@
               <ul>
                 <li>Verifica e bloqueia contas de adotadores, ONGs, prefeituras e empresas</li>
                 <li>Aprova ou rejeita parceiros, anúncios e produtos</li>
-                <li>Responde Ajuda e Reclamações (as prioritárias aparecem primeiro)</li>
-                <li>Gerencia parceiros, anúncios e produtos e vê a visão geral da plataforma</li>
-                <li>Não exclui contas, não muda tipo nem plano, não vê logs nem receita</li>
+                <li>Responde Ajuda e Reclamações</li>
+                <li>Vê a visão geral da plataforma e o log do sistema</li>
               </ul>
             </div>
             <div class="role-card">
               <h3>👑 Administrador</h3>
               <ul>
                 <li>Faz tudo o que o Supervisor faz</li>
-                <li>Exclui contas e promove ou rebaixa Supervisores</li>
-                <li>Define o plano de qualquer conta, inclusive o institucional das prefeituras</li>
-                <li>Vê a receita simulada das assinaturas</li>
-                <li>Vê o log do sistema e exporta em CSV</li>
+                <li>Promove e remove supervisores e exclui contas</li>
+                <li>Gerencia parceiros, anúncios e produtos da lojinha</li>
+                <li>Consulta e exporta o log completo do sistema</li>
               </ul>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- PLANS PAGE (assinaturas) -->
-      <div id="page-plans" class="page">
-        <div class="plans-container">
-          <h2>Planos PetMatch</h2>
-          <p class="plans-lead">Adotar e divulgar pets continua <strong>gratuito</strong>. Os planos anuais são um extra para quem quer mais praticidade e organização, e parte da receita apoia a causa animal.</p>
-
-          <div class="plans-perks">
-            <div><span>💰</span><b>Menos de R$ 5 por mês</b><small>no plano de adotador</small></div>
-            <div><span>🔓</span><b>O essencial é grátis</b><small>nada é tirado de quem não assina</small></div>
-            <div><span>🎁</span><b>cancele quando quiser</b><small>cancele quando quiser</small></div>
-            <div><span>🐾</span><b>Apoia a causa animal</b><small>parte da receita vai para a causa</small></div>
-          </div>
-
-          <div class="billing-toggle" role="group" aria-label="Tipo de conta">
-            <button type="button" id="audAdopter" class="active" onclick="setPlanAudience('adopter')">Para adotadores</button>
-            <button type="button" id="audOng" onclick="setPlanAudience('ong')">Para ONGs</button>
-          </div>
-
-          <div id="plansAdopter" class="plans-grid plans-grid-2">
-            <div class="plan-card">
-              <h3>Adotador Grátis</h3>
-              <p class="plan-for">Para começar</p>
-              <ul class="plan-features">
-                <li>Cadastro e perfil</li>
-                <li>Ver e filtrar os pets</li>
-                <li>Favoritar pets</li>
-                <li>Enviar solicitações de adoção</li>
-                <li>Acompanhar o andamento e o histórico</li>
-              </ul>
-              <div class="plan-price"><span class="plan-amount">R$ 0</span></div>
-              <a class="btn-secondary plan-btn" href="#" onclick="showPage('pets');return false;">Começar grátis</a>
-            </div>
-
-            <div class="plan-card plan-featured">
-              <span class="plan-badge">Mais completo</span>
-              <h3>Adotador Plus</h3>
-              <p class="plan-for">Para cuidar do pet depois da adoção</p>
-              <ul class="plan-features">
-                <li>Tudo do plano Grátis</li>
-                <li><b>Compatibilidade avançada</b>: rotina, casa, tempo livre e preferências</li>
-                <li><b>Acompanhamento pós-adoção</b> da adaptação do pet</li>
-                <li><b>Carteirinha digital</b> do pet</li>
-                <li><b>Histórico de saúde</b>: consultas, vacinas e vermífugo</li>
-                <li><b>Lembretes</b> de vacina e consulta</li>
-                <li><b>Diário de evolução</b> com fotos e anotações</li>
-                <li><b>Selo Adotador Plus</b> no perfil, que ajuda a ONG a confiar</li>
-                <li><b>Primeiro a ver</b> os pets novos</li>
-                <li><b>Descontos</b> na lojinha e em parceiros</li>
-                <li>Sem anúncios</li>
-                <li>Suporte prioritário</li>
-              </ul>
-              <div class="plan-price"><span class="plan-amount">R$ 49,90</span> <small class="plan-period">/ano</small><small class="plan-per-month">equivale a R$ 4,16 por mês</small></div>
-              <button type="button" class="btn-primary plan-btn" data-plan="plus" onclick="subscribePlan('plus')">Assinar</button>
-            </div>
-          </div>
-
-          <div id="plansOng" class="plans-grid" style="display:none;">
-            <div class="plan-card">
-              <h3>ONG Grátis</h3>
-              <p class="plan-for">Para começar</p>
-              <ul class="plan-features">
-                <li>Cadastrar pets (limite básico)</li>
-                <li>Receber e responder solicitações</li>
-                <li>Ver o perfil de quem quer adotar</li>
-                <li>Informações de saúde de cada pet</li>
-                <li>Painel com as principais ferramentas</li>
-              </ul>
-              <div class="plan-price"><span class="plan-amount">R$ 0</span></div>
-              <a class="btn-secondary plan-btn" href="#" onclick="openAuthModal();return false;">Criar conta de ONG</a>
-            </div>
-
-            <div class="plan-card">
-              <h3>ONG Essencial</h3>
-              <p class="plan-for">Para organizar a rotina</p>
-              <ul class="plan-features">
-                <li>Tudo do plano Grátis</li>
-                <li>Cadastro ampliado: fotos, porte, características e saúde</li>
-                <li>Gerenciar solicitações e acompanhar cada etapa</li>
-                <li>Comunicação com interessados e adotantes</li>
-                <li>Estatísticas básicas de pets, pedidos e adoções</li>
-                <li><b>Selo ONG Verificada</b> na página dos pets</li>
-                <li><b>Link próprio da ONG</b> para divulgar nas redes</li>
-                <li><b>Card pronto</b> de cada pet para compartilhar</li>
-              </ul>
-              <div class="plan-price"><span class="plan-amount">R$ 119,90</span> <small class="plan-period">/ano</small><small class="plan-per-month">equivale a R$ 9,99 por mês</small></div>
-              <button type="button" class="btn-secondary plan-btn" data-plan="essencial" onclick="subscribePlan('essencial')">Assinar</button>
-            </div>
-
-            <div class="plan-card plan-featured">
-              <span class="plan-badge">Mais indicado</span>
-              <h3>ONG Premium</h3>
-              <p class="plan-for">Para crescer e divulgar mais</p>
-              <ul class="plan-features">
-                <li>Tudo do plano Essencial</li>
-                <li>Limite ampliado de pets</li>
-                <li><b>Relatórios completos</b> de adoção</li>
-                <li><b>Painel de desempenho</b> com indicadores</li>
-                <li>Gerenciar visitas e entrevistas</li>
-                <li>Histórico de acompanhamento dos adotantes</li>
-                <li><b>Pets em destaque</b> no topo das buscas</li>
-                <li><b>Mais de um administrador</b> na equipe</li>
-                <li><b>Doações por Pix</b> na página da ONG</li>
-                <li><b>Modelos prontos</b> de termo de adoção e questionário</li>
-                <li><b>Eventos de adoção</b> divulgados no site</li>
-                <li>Suporte prioritário</li>
-              </ul>
-              <div class="plan-price"><span class="plan-amount">R$ 199,90</span> <small class="plan-period">/ano</small><small class="plan-per-month">equivale a R$ 16,66 por mês</small></div>
-              <button type="button" class="btn-primary plan-btn" data-plan="premium" onclick="subscribePlan('premium')">Assinar</button>
-            </div>
-          </div>
-          <p class="plans-note">Valores de exemplo (projeção do projeto acadêmico TCC 3DDS). O pagamento é uma simulação: ao assinar o plano é ativado por 1 ano, sem cobrança, e os recursos são liberados na hora. Você pode cancelar em Meu Plano.</p>
-
-          <div class="plans-faq">
-            <details><summary>Preciso pagar para adotar?</summary><p>Não. Cadastrar, ver os pets, favoritar e pedir adoção são gratuitos, para adotadores e para ONGs.</p></details>
-            <details><summary>Posso cancelar quando quiser?</summary><p>Sim. A ideia é ter cancelamento simples, e o que você já tinha no plano grátis continua com você.</p></details>
-            <details><summary>Para onde vai o dinheiro?</summary><p>Para manter e melhorar a plataforma e, em parte, para iniciativas de apoio à causa animal.</p></details>
-            <details><summary>Quais formas de pagamento?</summary><p>Pix e cartão, em uma fase futura. Neste projeto o pagamento é só uma simulação.</p></details>
-          </div>
-
-          <div class="plans-gov">
-            <h3>Empresa Parceira</h3>
-            <p>Para pet shops, clínicas e marcas: apareça na página Parceiros perto de quem mora na região, com selo de destaque, posição no topo e espaço para anúncios.</p>
-            <div class="plan-price"><span class="plan-amount">R$ 499</span> <small class="plan-period">/ano</small></div>
-            <button type="button" class="btn-primary plan-btn" data-plan="parceira" onclick="subscribePlan('parceira')">Assinar</button>
-          </div>
-
-          <div class="plans-gov">
-            <h3>Para prefeituras</h3>
-            <p>Divulgue campanhas como castração gratuita e vacinação para quem mora na cidade, com painel de Administrador e Supervisores, histórico e log do sistema. Contratação por licitação, dispensa ou termo de colaboração, com valor sob proposta e LGPD (prefeitura controladora, PetMatch operador).</p>
-            <a class="btn-secondary plan-btn" href="mailto:contato@petmatch.com?subject=Proposta%20-%20Prefeitura">Solicitar proposta</a> <a class="btn-secondary plan-btn" href="#" onclick="showPage('roles');return false;">Ver funções de cada perfil</a>
-          </div>
-
-          <h3 class="plans-subtitle">Outras formas de apoiar o PetMatch</h3>
-          <div class="plans-steps">
-            <div class="plans-step"><span>1</span><b>Parceiros</b><p>Pet shops, clínicas e marcas de ração patrocinam espaços no site.</p></div>
-            <div class="plans-step"><span>2</span><b>Destaque</b><p>ONGs impulsionam pets para aparecerem primeiro.</p></div>
-            <div class="plans-step"><span>3</span><b>Doações</b><p>Apoio direto às ONGs, com uma pequena taxa da plataforma.</p></div>
-            <div class="plans-step"><span>4</span><b>Serviços</b><p>Comissão em produtos e serviços para pets indicados no site.</p></div>
           </div>
         </div>
       </div>
@@ -1123,9 +947,7 @@
             <li><a href="#" onclick="showPage('about')">Sobre</a></li>
             <li><a href="#" onclick="showPage('partners')">Parceiros perto de você</a></li>
             <li><a href="#" onclick="showPage('shop')">Lojinha</a></li>
-            <li><a href="#" onclick="showPage('plans')">Planos</a></li>
             <li><a href="#" onclick="showPage('roles')">Perfis e Funções</a></li>
-            <li><a href="#" onclick="showPage('events')">Eventos de adoção</a></li>
             <li><a href="#" onclick="showPage('help')">Ajuda e Reclamações</a></li>
             <li><a href="#" onclick="showPage('privacy')">Política de Privacidade (LGPD)</a></li>
           </ul>

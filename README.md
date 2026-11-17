@@ -24,12 +24,11 @@ Plataforma web para adoção de animais de estimação, conectando adotadores co
 - ✅ Agendar visitas pré-adoção
 - ✅ Concluir a adoção (marca o pet como adotado)
 
-### Planos anuais (pagamento simulado)
-- **Adotador Plus** (R$ 49,90/ano): compatibilidade avançada, Meus Pets (carteirinha digital, histórico de saúde, lembretes, diário de evolução), pets novos 24h antes, descontos, sem anúncios, suporte prioritário.
-- **ONG Essencial** (R$ 119,90/ano): até 30 pets, selo de ONG Verificada, conversa com adotantes, estatísticas, página própria e cartão de divulgação.
-- **ONG Premium** (R$ 199,90/ano): até 100 pets, destaque, relatórios completos e CSV, visitas/entrevistas, acompanhamento, equipe (até 5 administradores extras), Pix, eventos e modelos de documentos.
-- **Empresa Parceira** (R$ 499/ano): mais empresas e produtos, anúncios e destaque. **Prefeitura institucional**: sob proposta (anúncios, indicadores do município).
-- Gratuito para todos os perfis. Conteúdo de Prefeitura e Empresa passa por aprovação do Supervisor/Administrador.
+### Perfis e recursos (tudo gratuito)
+- Todos os recursos são gratuitos: não há planos nem assinaturas.
+- **Adotador:** busca de pets com filtros, compatibilidade (tipo, porte e energia), solicitações, favoritos e Loja.
+- **ONG:** cadastro e gerenciamento de pets, solicitações e visitas agendadas.
+- **Empresa Parceira** e **Prefeitura:** cadastram parceiros e anúncios, sujeitos à aprovação do Supervisor/Administrador. A Prefeitura também vê indicadores do município.
 
 ### Hierarquia de acesso (Administrador > Supervisor > Usuário)
 | Nível | Quem é | O que pode fazer |
@@ -51,7 +50,7 @@ Plataforma web para adoção de animais de estimação, conectando adotadores co
 - ✅ **Ajuda e Reclamações:** perguntas frequentes e formulário (ajuda, reclamação ou sugestão); Administrador e Supervisor respondem pelo painel
 - ✅ **Log de sistema:** registro de auditoria (acessos, solicitações, moderação, pets, mensagens e LGPD), visível só ao Administrador, com filtro e download em CSV; ninguém altera nem apaga os registros
 - ✅ **Filtro de pets por CEP**, **Parceiros perto de você** (por cidade, CEP e categoria, com destaque pago), **anúncios** da prefeitura e de empresas (com explicação, local e link para o mapa) e distância até o parceiro quando o usuário permite a localização do navegador (não é guardada) e **Lojinha** (vitrine); tudo gerenciado pelo Administrador e Supervisor no painel
-- ✅ **Planos anuais:** Adotador Grátis e Plus (R$ 49,90/ano), ONG Grátis, Essencial (R$ 119,90/ano) e Premium (R$ 199,90/ano), Empresa Parceira e plano institucional para prefeituras (modelo de negócio do TCC; valores de exemplo e pagamento simulado; recursos novos marcados "em breve")
+- ✅ **Sem planos pagos:** todos os recursos são gratuitos (removidos a pedido da orientação do projeto)
 - ✅ **LGPD:** Política de Privacidade, consentimento no cadastro (registrado com data e versão), aviso de armazenamento no navegador, página "Meus Dados" para baixar os dados (JSON) e excluir a própria conta
 - ✅ Estatísticas da home com dados reais do banco (pets adotados, disponíveis e famílias felizes)
 - ✅ Depoimentos rotativos
@@ -95,7 +94,9 @@ Crie um projeto gratuito em [supabase.com](https://supabase.com/dashboard), abra
 7. `supabase-add-history-logs-help-lgpd.sql` — adiciona histórico das solicitações, log de sistema, ajuda e reclamações e LGPD
 8. `supabase-add-partners-ads-shop.sql` — adiciona CEP (pets, parceiros e perfil), parceiros por localização, anúncios (prefeitura e empresas) e lojinha, com dados de exemplo
 9. `supabase-add-plans-roles-features.sql` — planos anuais (assinatura simulada), perfis Prefeitura e Empresa, aprovação de conteúdo, equipe da ONG, chat, eventos, carteirinha/saúde/diário, relatórios e visão geral
-9. `supabase-seed-pets-exemplo.sql` *(opcional)* — cadastra alguns pets de exemplo para teste (é necessário trocar o `ong_id` pelo id de uma ONG já cadastrada)
+10. `supabase-remove-plans.sql` — **remove os planos e recursos pagos** (rode depois do script 9; pode rodar mais de uma vez)
+11. `supabase-seed-pets-exemplo.sql` *(opcional)* — cadastra alguns pets de exemplo para teste (é necessário trocar o `ong_id` pelo id de uma ONG já cadastrada)
+12. (opcional) `supabase-seed-parceiros-loja.sql` — lojas reais (Petz, uma por capital), produtos da loja e anúncios de demonstração
 
 **3. Configure as credenciais do projeto**
 
@@ -137,6 +138,7 @@ PetMatch-website-main/
 ├── supabase-add-history-logs-help-lgpd.sql               # Script 7: histórico, log de sistema, ajuda e reclamações e LGPD
 ├── supabase-add-partners-ads-shop.sql                    # Script 8: CEP, parceiros, anúncios e lojinha
 ├── supabase-add-plans-roles-features.sql                 # Script 9: planos, perfis e recursos pagos
+├── supabase-remove-plans.sql                             # Script 10: remove planos e recursos pagos
 ├── supabase-seed-pets-exemplo.sql                        # Script opcional: pets de exemplo
 └── README.md                                             # Este arquivo
 ```
