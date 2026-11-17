@@ -518,6 +518,14 @@ document.addEventListener('click', (e) => {
 // ============================================================================
 // NAVEGAÇÃO
 // ============================================================================
+function goAbout() {
+  showPage('home');
+  setTimeout(() => {
+    const el = document.getElementById('homeAbout');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
+}
+
 function showPage(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
