@@ -99,7 +99,7 @@ Crie um projeto gratuito em [supabase.com](https://supabase.com/dashboard), abra
 10. `supabase-remove-plans.sql` — **remove os planos e recursos pagos** (rode depois do script 9; pode rodar mais de uma vez)
 11. `supabase-add-bairros-perdidos.sql` — **bairro e posição nos pets** e a tabela de **animais perdidos/encontrados** (o contato só aparece para quem está logado; no máximo 10 avisos abertos por pessoa)
 12. `supabase-seed-pets-exemplo.sql` *(opcional)* — cadastra alguns pets de exemplo para teste (é necessário trocar o `ong_id` pelo id de uma ONG já cadastrada)
-13. (opcional) `supabase-seed-mais-pets.sql` — 26 pets com bairro e posição no mapa (usa a primeira ONG cadastrada; rode depois do script 11)
+13. (opcional) `supabase-seed-mais-pets.sql` — 32 pets com bairro e posição no mapa (usa a primeira ONG cadastrada; rode depois do script 11)
 14. (opcional) `supabase-seed-parceiros-loja.sql` — lojas reais (Petz, uma por capital), produtos da loja e anúncios de demonstração
 
 **3. Configure as credenciais do projeto**
@@ -144,7 +144,7 @@ PetMatch-website-main/
 ├── supabase-add-plans-roles-features.sql                 # Script 9: planos, perfis e recursos pagos
 ├── supabase-remove-plans.sql                             # Script 10: remove planos e recursos pagos
 ├── supabase-add-bairros-perdidos.sql                     # Script 11: bairros e animais perdidos
-├── supabase-seed-mais-pets.sql                           # Script opcional: 26 pets com bairro e mapa
+├── supabase-seed-mais-pets.sql                           # Script opcional: 32 pets com bairro e mapa
 ├── supabase-seed-pets-exemplo.sql                        # Script opcional: pets de exemplo
 └── README.md                                             # Este arquivo
 ```
