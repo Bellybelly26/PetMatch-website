@@ -538,6 +538,8 @@ function showPage(page) {
     loadPartnersPage();
   } else if (page === 'shop') {
     loadShopPage();
+  } else if (page === 'lost') {
+    loadLostPage();
   } else if (page === 'my-requests') {
     renderMyRequests();
   } else if (page === 'adopter-profile') {
@@ -711,12 +713,16 @@ function applyPetFilters() {
   const sizeFilter = document.getElementById('filterSize')?.value;
   const locationFilter = document.getElementById('filterLocation')?.value.toLowerCase();
   const cepFilter = normCep(document.getElementById('filterCep')?.value);
+  const stateFilter = document.getElementById('filterState')?.value;
+  const nbFilter = fillNeighborhoodFilter();
   const favoritesOnly = document.getElementById('filterFavorites')?.checked;
 
   if (typeFilter) pets = pets.filter(p => p.type === typeFilter);
   if (sizeFilter) pets = pets.filter(p => p.size === sizeFilter);
   if (locationFilter) pets = pets.filter(p => p.city.toLowerCase().includes(locationFilter));
+  if (stateFilter) pets = pets.filter(p => p.state === stateFilter);
   if (cepFilter) pets = pets.filter(p => (p.cep || '').startsWith(cepFilter));
+  if (nbFilter) pets = pets.filter(p => (p.neighborhood || '').toLowerCase() === nbFilter.toLowerCase());
   if (favoritesOnly) pets = pets.filter(p => myFavoritePetIds.includes(p.id));
 
   // Se o adotador pediu, mostra primeiro os mais compatíveis
@@ -752,7 +758,7 @@ function buildPetCard(pet) {
       <div class="pet-name">${escapeHtml(pet.name)}</div>
       <div class="pet-details">${escapeHtml(pet.breed)}</div>
       <div class="pet-details">${escapeHtml(pet.age)} anos • ${escapeHtml(pet.size)}</div>
-      <div class="pet-details">📍 ${escapeHtml(pet.city)}${pet.cep ? ' • CEP ' + escapeHtml(formatCep(pet.cep)) : ''}</div>
+      <div class="pet-details">📍 ${pet.neighborhood ? escapeHtml(pet.neighborhood) + ' • ' : ''}${escapeHtml(pet.city)}${pet.state ? ' - ' + escapeHtml(pet.state) : ''}${pet.cep ? ' • CEP ' + escapeHtml(formatCep(pet.cep)) : ''}</div>
       <div class="pet-details">🏠 ${escapeHtml(pet.ongName || 'ONG não identificada')}</div>
       <div class="pet-actions">
         <button class="btn-favorite ${isFavorite ? 'active' : ''}" onclick="toggleFavorite('${pet.id}')">
@@ -765,12 +771,28 @@ function buildPetCard(pet) {
   return card;
 }
 
+const HOME_PETS_COUNT = 12;
+// Mistura os tipos (cães, gatos, pássaros...) para a home não ficar só com um tipo de bicho
+function diversePets(list, n) {
+  const by = {};
+  list.forEach(p => { (by[p.type] = by[p.type] || []).push(p); });
+  const keys = Object.keys(by);
+  const out = [];
+  while (out.length < n && keys.some(k => by[k].length)) {
+    for (const k of keys) {
+      if (out.length >= n) break;
+      if (by[k].length) out.push(by[k].shift());
+    }
+  }
+  return out;
+}
+
 // Página inicial: mostra os primeiros pets disponíveis (mesmos dados da página "Pets")
 function renderHomePets() {
   const grid = document.getElementById('homePetsGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  const pets = allPets.slice(0, 6);
+  const pets = diversePets(allPets, HOME_PETS_COUNT);
   if (pets.length === 0) {
     grid.innerHTML = '<p style="text-align:center; color:#999; grid-column: 1 / -1;">Nenhum pet disponível no momento.</p>';
     return;
@@ -828,7 +850,7 @@ function openPetDetail(petId) {
       <p><strong>Idade:</strong> ${pet.age} anos</p>
       <p><strong>Tamanho:</strong> ${pet.size}</p>
       <p><strong>Energia:</strong> ${pet.energy || 'Moderada'}</p>
-      <p><strong>Localização:</strong> ${pet.city}, PR${pet.cep ? ' • CEP ' + escapeHtml(formatCep(pet.cep)) : ''}</p>
+      <p><strong>Localização:</strong> ${pet.neighborhood ? escapeHtml(pet.neighborhood) + ', ' : ''}${escapeHtml(pet.city)}${pet.cep ? ' • CEP ' + escapeHtml(formatCep(pet.cep)) : ''}</p>
       <p><strong>ONG responsável:</strong> ${escapeHtml(pet.ongName || 'Não identificada')}</p>
     </div>
     ${compatDetailHtml(pet)}
@@ -1222,6 +1244,8 @@ function openAddPetForm() {
   document.getElementById('petFormEnergy').value = 'Moderada';
   document.getElementById('petFormCity').value = currentUser?.city || '';
   document.getElementById('petFormCep').value = formatCep(currentUser?.cep);
+  document.getElementById('petFormNeighborhood').value = '';
+  document.getElementById('petFormState').value = 'PR';
   document.getElementById('petFormImage').value = '';
   document.getElementById('petFormVideo').value = '';
   document.getElementById('petFormVaccinated').checked = false;
@@ -1248,6 +1272,8 @@ async function openEditPetForm(petId) {
   document.getElementById('petFormEnergy').value = pet.energy || 'Moderada';
   document.getElementById('petFormCity').value = pet.city;
   document.getElementById('petFormCep').value = formatCep(pet.cep);
+  document.getElementById('petFormNeighborhood').value = pet.neighborhood || '';
+  document.getElementById('petFormState').value = pet.state || 'PR';
   document.getElementById('petFormImage').value = '';
   document.getElementById('petFormVideo').value = '';
   document.getElementById('petFormVaccinated').checked = !!pet.vaccinated;
@@ -1278,6 +1304,7 @@ async function savePetForm(e) {
     alert('O CEP deve ter 8 números (ex.: 80010-000).');
     return;
   }
+  const neighborhood = document.getElementById('petFormNeighborhood').value.trim();
   const imageFile = document.getElementById('petFormImage').files[0];
   const videoFile = document.getElementById('petFormVideo').files[0];
   const vaccinated = document.getElementById('petFormVaccinated').checked;
@@ -1292,10 +1319,15 @@ async function savePetForm(e) {
   }
 
   const petData = {
-    name, type, breed, age, size, energy, city, cep: cep || null, ong_id: currentUser.id,
+    name, type, breed, age, size, energy, city, cep: cep || null, neighborhood: neighborhood || null, state: document.getElementById('petFormState').value || null, ong_id: currentUser.id,
     vaccinated, neutered, dewormed,
     health_notes: healthNotes, temperament
   };
+
+  // posição no mapa (tentativa; se falhar o pet é salvo do mesmo jeito)
+  const pos = await geocodePlace([neighborhood, city, document.getElementById('petFormState').value, 'Brasil'].filter(Boolean).join(', '));
+  petData.lat = pos ? pos.lat : null;
+  petData.lng = pos ? pos.lng : null;
 
   if (imageFile) {
     try {
@@ -2981,6 +3013,7 @@ async function saveCompat(e) {
 }
 
 function closePetToolModal() {
+  if (typeof lfMap !== 'undefined' && lfMap) { lfMap.remove(); lfMap = null; lfMarker = null; }
   document.getElementById('petToolModal').classList.remove('active');
 }
 
@@ -3266,4 +3299,513 @@ async function saveChangedPassword(e) {
   if (error) { alert('Não foi possível trocar a senha: ' + error.message); return; }
   closePetToolModal();
   alert('Senha alterada com sucesso!');
+}
+
+// ============================================================================
+// CEP -> cidade e bairro (ViaCEP) e posição no mapa (OpenStreetMap/Nominatim)
+// ============================================================================
+
+// Estados: sigla -> nome, código do IBGE, centro e zoom (usado quando o contorno não carrega)
+const BR_STATES = {
+  AC: ['Acre', '12', -9.0, -70.5, 6], AL: ['Alagoas', '27', -9.6, -36.6, 8], AP: ['Amapá', '16', 1.4, -51.8, 6],
+  AM: ['Amazonas', '13', -3.9, -64.6, 5], BA: ['Bahia', '29', -12.6, -41.7, 6], CE: ['Ceará', '23', -5.2, -39.5, 7],
+  DF: ['Distrito Federal', '53', -15.8, -47.8, 10], ES: ['Espírito Santo', '32', -19.6, -40.7, 8], GO: ['Goiás', '52', -15.9, -49.8, 6],
+  MA: ['Maranhão', '21', -5.0, -45.3, 6], MT: ['Mato Grosso', '51', -12.9, -55.9, 5], MS: ['Mato Grosso do Sul', '50', -20.5, -54.6, 6],
+  MG: ['Minas Gerais', '31', -18.5, -44.6, 6], PA: ['Pará', '15', -3.8, -52.5, 5], PB: ['Paraíba', '25', -7.2, -36.8, 8],
+  PR: ['Paraná', '41', -24.6, -51.5, 7], PE: ['Pernambuco', '26', -8.4, -37.9, 7], PI: ['Piauí', '22', -7.7, -42.7, 6],
+  RJ: ['Rio de Janeiro', '33', -22.3, -42.7, 8], RN: ['Rio Grande do Norte', '24', -5.8, -36.6, 8], RS: ['Rio Grande do Sul', '43', -29.7, -53.5, 6],
+  RO: ['Rondônia', '11', -10.9, -62.8, 6], RR: ['Roraima', '14', 2.0, -61.4, 6], SC: ['Santa Catarina', '42', -27.3, -50.5, 7],
+  SP: ['São Paulo', '35', -22.2, -48.7, 7], SE: ['Sergipe', '28', -10.6, -37.4, 9], TO: ['Tocantins', '17', -10.2, -48.3, 6]
+};
+const IBGE_UF = Object.fromEntries(Object.entries(BR_STATES).map(([uf, v]) => [v[1], uf]));
+const BR_BOUNDS = [[-33.8, -73.9], [5.3, -34.8]];
+
+// <option> de todos os estados (em ordem alfabética pelo nome)
+function stateOptionsHtml(selected, withAll) {
+  return (withAll ? '<option value="">Todos os estados</option>' : '') +
+    Object.entries(BR_STATES).sort((a, b) => a[1][0].localeCompare(b[1][0], 'pt-BR'))
+      .map(([uf, v]) => `<option value="${uf}"${uf === selected ? ' selected' : ''}>${v[0]} (${uf})</option>`).join('');
+}
+
+function initStateSelects() {
+  ['filterState', 'lostState'].forEach(id => { const el = document.getElementById(id); if (el && !el.options.length) el.innerHTML = stateOptionsHtml('', true); });
+  const pf = document.getElementById('petFormState');
+  if (pf && !pf.options.length) pf.innerHTML = stateOptionsHtml('PR', false);
+}
+document.addEventListener('DOMContentLoaded', initStateSelects);
+initStateSelects();
+
+const cepCache = {};
+async function lookupCep(cep) {
+  const d = normCep(cep);
+  if (d.length !== 8) return null;
+  if (d in cepCache) return cepCache[d];
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${d}/json/`);
+    const j = await r.json();
+    cepCache[d] = j && !j.erro ? { city: j.localidade || '', neighborhood: j.bairro || '', uf: j.uf || '' } : null;
+  } catch (e) {
+    return null;
+  }
+  return cepCache[d];
+}
+
+// Quando o CEP fica completo, preenche cidade e bairro sozinho
+async function cepAutofill(cepId, cityId, nbId, statusId, stateId) {
+  const cep = normCep(document.getElementById(cepId).value);
+  const status = statusId ? document.getElementById(statusId) : null;
+  if (cep.length !== 8) return;
+  if (status) status.textContent = 'Buscando o endereço...';
+  const info = await lookupCep(cep);
+  if (normCep(document.getElementById(cepId).value) !== cep) return;
+  if (!info) {
+    if (status) status.textContent = 'CEP não encontrado. Preencha a cidade e o bairro à mão.';
+    return;
+  }
+  if (info.city) document.getElementById(cityId).value = info.city;
+  if (nbId && info.neighborhood) document.getElementById(nbId).value = info.neighborhood;
+  if (stateId && info.uf && BR_STATES[info.uf]) document.getElementById(stateId).value = info.uf;
+  if (status) status.textContent = `✔ ${info.neighborhood ? info.neighborhood + ', ' : ''}${info.city}`;
+}
+
+let geoCache = {};
+try { geoCache = JSON.parse(localStorage.getItem('petmatch_geocache') || '{}'); } catch (e) { geoCache = {}; }
+let geoQueue = Promise.resolve();
+// Busca latitude/longitude de um lugar. Uma consulta por vez (limite do serviço gratuito) e guarda no navegador.
+function geocodePlace(q) {
+  const key = String(q || '').trim().toLowerCase();
+  if (!key) return Promise.resolve(null);
+  if (key in geoCache) return Promise.resolve(geoCache[key]);
+  const p = geoQueue.then(async () => {
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=' + encodeURIComponent(q));
+      const j = await r.json();
+      const v = j && j[0] ? { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) } : null;
+      geoCache[key] = v;
+      try { localStorage.setItem('petmatch_geocache', JSON.stringify(geoCache)); } catch (e) { /* sem armazenamento */ }
+      await new Promise(res => setTimeout(res, 1100));
+      return v;
+    } catch (e) {
+      return null;
+    }
+  });
+  geoQueue = p.catch(() => null);
+  return p;
+}
+
+// Lista de bairros no filtro (só os que existem nos pets; respeita a cidade digitada)
+function fillNeighborhoodFilter() {
+  const sel = document.getElementById('filterNeighborhood');
+  if (!sel) return '';
+  const city = (document.getElementById('filterLocation')?.value || '').toLowerCase();
+  const names = [...new Set(allPets
+    .filter(p => p.neighborhood && (!city || (p.city || '').toLowerCase().includes(city)))
+    .map(p => p.neighborhood.trim()))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const current = sel.value;
+  const sig = names.join('|');
+  if (sel.dataset.sig !== sig) {
+    sel.innerHTML = '<option value="">Todos os bairros</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    sel.dataset.sig = sig;
+    sel.value = names.includes(current) ? current : '';
+  }
+  return sel.value;
+}
+
+// ============================================================================
+// ANIMAIS PERDIDOS / ENCONTRADOS (mapa com Leaflet + OpenStreetMap)
+// ============================================================================
+
+const LOST_EMOJI = { dog: '🐕', cat: '🐈', bird: '🐦', rabbit: '🐇', other: '🐾' };
+const LOST_TYPE_LABEL = { dog: 'Cachorro', cat: 'Gato', bird: 'Pássaro', rabbit: 'Coelho', other: 'Outro animal' };
+const LOST_COLS = 'id, reporter_id, kind, pet_name, type, description, photo_url, city, neighborhood, cep, state, lat, lng, seen_on, status, created_at';
+let lostItems = [];
+let lostMap = null, lostLayer = null;
+let lostUserPos = null;
+let leafletPromise = null;
+let lostRenderToken = 0;
+let brStatesLayer = null, brStatesTried = false, lostViewKey = null;
+const IBGE_URL = 'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF';
+
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (leafletPromise) return leafletPromise;
+  leafletPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = () => resolve();
+    s.onerror = () => { leafletPromise = null; reject(new Error('leaflet')); };
+    document.head.appendChild(s);
+  });
+  return leafletPromise;
+}
+
+function lostIcon(emoji, cls) {
+  return L.divIcon({ className: 'lost-pin-wrap', html: `<div class="lost-pin ${cls}">${emoji}</div>`, iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -16] });
+}
+
+function distKm(a, b) {
+  const R = 6371, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+async function loadLostPage() {
+  const box = document.getElementById('lostMap');
+  let mapOk = true;
+  try {
+    await loadLeaflet();
+    if (!lostMap || !box.contains(lostMap.getContainer())) {
+      box.innerHTML = '';
+      lostMap = L.map(box).setView([-14.2, -51.9], 4);
+      lostViewKey = null;
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(lostMap);
+      lostLayer = L.layerGroup().addTo(lostMap);
+      brStatesLayer = null; brStatesTried = false;
+      loadBrazilStates();
+    }
+    setTimeout(() => lostMap && lostMap.invalidateSize(), 60);
+  } catch (e) {
+    mapOk = false;
+    box.innerHTML = '<p class="lost-map-msg">Não foi possível carregar o mapa agora. A lista abaixo continua funcionando.</p>';
+  }
+  if (!allPets.length) await renderPets();
+  const cols = currentUser ? '*' : LOST_COLS;
+  const { data, error } = await sb.from('lost_animals').select(cols).eq('status', 'open').order('created_at', { ascending: false }).limit(300);
+  if (error) {
+    document.getElementById('lostList').innerHTML = `<p class="lost-empty">Não foi possível carregar os avisos: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  lostItems = data || [];
+  renderLost(mapOk);
+}
+
+function lostFilterNeighborhoods() {
+  const sel = document.getElementById('lostNeighborhood');
+  const city = document.getElementById('lostCity').value.trim().toLowerCase();
+  const stSel = document.getElementById('lostState').value;
+  const names = [...new Set(lostItems.filter(i => i.neighborhood && (!stSel || i.state === stSel) && (!city || i.city.toLowerCase().includes(city)))
+    .map(i => i.neighborhood.trim()))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const sig = names.join('|');
+  const cur = sel.value;
+  if (sel.dataset.sig !== sig) {
+    sel.innerHTML = '<option value="">Todos os bairros</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+    sel.dataset.sig = sig;
+    sel.value = names.includes(cur) ? cur : '';
+  }
+  return sel.value;
+}
+
+function lostItemCard(i) {
+  const mine = currentUser && (currentUser.id === i.reporter_id || ['admin', 'supervisor'].includes(currentUser.user_type));
+  const digits = (i.contact || '').replace(/\D/g, '');
+  const contact = currentUser
+    ? `📞 ${escapeHtml(i.contact || '')}${digits.length >= 10 ? ` <a class="lost-wa" href="https://wa.me/55${digits.replace(/^55/, '')}" target="_blank" rel="noopener">WhatsApp</a>` : ''}`
+    : `<button class="btn-secondary lost-login" onclick="openAuthModal()">Entre para ver o contato</button>`;
+  const img = safeImage(i.photo_url);
+  const dist = i._km != null ? `<span class="lost-km">a ${i._km < 10 ? i._km.toFixed(1) : Math.round(i._km)} km de você</span>` : '';
+  return `<div class="lost-card ${i.kind}" id="lost-${i.id}">
+    ${img ? `<img src="${escapeHtml(img)}" alt="" loading="lazy">` : `<div class="lost-noimg">${LOST_EMOJI[i.type] || '🐾'}</div>`}
+    <div class="lost-card-body">
+      <span class="lost-tag ${i.kind}">${i.kind === 'lost' ? '🔴 Perdido' : '🟢 Encontrado'}</span>
+      <h4>${escapeHtml(i.pet_name || LOST_TYPE_LABEL[i.type] || 'Animal')} <small>${escapeHtml(LOST_TYPE_LABEL[i.type] || '')}</small></h4>
+      <p>${escapeHtml(i.description)}</p>
+      <p class="lost-where">📍 ${i.neighborhood ? escapeHtml(i.neighborhood) + ', ' : ''}${escapeHtml(i.city)}${i.state ? ' - ' + escapeHtml(i.state) : ''} • visto em ${new Date(i.seen_on + 'T12:00:00').toLocaleDateString('pt-BR')} ${dist}</p>
+      <p class="lost-contact">${contact}</p>
+      <div class="lost-actions">
+        ${i.lat != null && lostMap ? `<button class="btn-secondary" onclick="focusLost('${i.id}')">Ver no mapa</button>` : ''}
+        ${mine ? `<button class="btn-secondary" onclick="resolveLost('${i.id}')">✅ ${i.kind === 'lost' ? 'Já encontrei' : 'Já devolvi'}</button><button class="btn-secondary lost-del" onclick="deleteLost('${i.id}')">🗑 Excluir</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+async function renderLost(mapOk) {
+  const token = ++lostRenderToken;
+  const kind = document.getElementById('lostKind').value;
+  const type = document.getElementById('lostType').value;
+  const city = document.getElementById('lostCity').value.trim().toLowerCase();
+  const stateSel = document.getElementById('lostState').value;
+  const nb = lostFilterNeighborhoods();
+  let items = lostItems.filter(i =>
+    (!stateSel || i.state === stateSel) && (!kind || i.kind === kind) && (!type || i.type === type) &&
+    (!city || i.city.toLowerCase().includes(city)) && (!nb || (i.neighborhood || '') === nb));
+  items = items.map(i => ({ ...i, _km: lostUserPos && i.lat != null ? distKm(lostUserPos, { lat: i.lat, lng: i.lng }) : null }));
+  if (lostUserPos) items.sort((a, b) => (a._km ?? 1e9) - (b._km ?? 1e9));
+
+  document.getElementById('lostList').innerHTML = items.length
+    ? items.map(lostItemCard).join('')
+    : '<p class="lost-empty">Nenhum aviso com esses filtros. Se você perdeu ou achou um bichinho, toque em “Avisar um animal”.</p>';
+  document.getElementById('lostStatus').textContent = `${items.length} aviso(s) aberto(s).`;
+
+  if (!lostMap || mapOk === false) return;
+  refreshStateLayer();
+  lostLayer.clearLayers();
+  const pts = [];
+  items.forEach(i => {
+    if (i.lat == null || i.lng == null) return;
+    const m = L.marker([i.lat, i.lng], { icon: lostIcon(LOST_EMOJI[i.type] || '🐾', i.kind) }).addTo(lostLayer);
+    m.bindPopup(`<b>${i.kind === 'lost' ? '🔴 Perdido' : '🟢 Encontrado'}: ${escapeHtml(i.pet_name || LOST_TYPE_LABEL[i.type] || 'Animal')}</b><br>${escapeHtml(i.description.slice(0, 120))}<br>📍 ${i.neighborhood ? escapeHtml(i.neighborhood) + ', ' : ''}${escapeHtml(i.city)}<br><a href="#" onclick="scrollToLost('${i.id}'); return false;">Ver detalhes e contato</a>`);
+    m.lostId = i.id;
+    pts.push([i.lat, i.lng]);
+  });
+  if (lostUserPos) {
+    L.circleMarker([lostUserPos.lat, lostUserPos.lng], { radius: 8, color: '#0066cc', fillColor: '#3b9bff', fillOpacity: 0.9 }).addTo(lostLayer).bindPopup('Você está aqui');
+    pts.push([lostUserPos.lat, lostUserPos.lng]);
+  }
+
+  // visão do mapa: Brasil inteiro, o estado escolhido ou a posição do usuário (só muda quando isso muda)
+  const viewKey = stateSel + '|' + (lostUserPos ? 'u' : '');
+  if (viewKey !== lostViewKey) {
+    lostViewKey = viewKey;
+    if (lostUserPos) lostMap.setView([lostUserPos.lat, lostUserPos.lng], 13);
+    else if (stateSel) zoomToState(stateSel);
+    else lostMap.fitBounds(BR_BOUNDS);
+  }
+
+  if (document.getElementById('lostShowPets').checked) {
+    let petList = allPets.filter(p => (!stateSel || p.state === stateSel) && (!type || p.type === type) && (!city || (p.city || '').toLowerCase().includes(city)) && (!nb || (p.neighborhood || '') === nb));
+    petList = petList.slice(0, 60);
+    for (const p of petList) {
+      if (token !== lostRenderToken) return;
+      let pos = p.lat != null && p.lng != null ? { lat: p.lat, lng: p.lng } : null;
+      if (!pos) pos = await geocodePlace([p.neighborhood, p.city, 'Brasil'].filter(Boolean).join(', '));
+      if (!pos) continue;
+      // pequeno deslocamento para pets do mesmo bairro não ficarem um em cima do outro
+      let h = 0; for (const ch of String(p.id)) h = (h * 31 + ch.charCodeAt(0)) % 997;
+      const lat = pos.lat + ((h % 31) - 15) * 0.00018, lng = pos.lng + (((h >> 3) % 31) - 15) * 0.00018;
+      L.marker([lat, lng], { icon: lostIcon(LOST_EMOJI[p.type] || '🐾', 'adopt') }).addTo(lostLayer)
+        .bindPopup(`<b>🔵 Para adoção: ${escapeHtml(p.name)}</b><br>${escapeHtml(p.breed)} • ${escapeHtml(p.city)}<br><a href="#" onclick="openPetDetail('${p.id}'); return false;">Ver detalhes</a>`);
+      pts.push([lat, lng]);
+    }
+  }
+}
+
+// ---- mapa do Brasil: contorno dos estados (dados do IBGE) ----
+async function loadBrazilStates() {
+  if (brStatesTried || !lostMap) return;
+  brStatesTried = true;
+  try {
+    const r = await fetch(IBGE_URL);
+    const gj = await r.json();
+    brStatesLayer = L.geoJSON(gj, {
+      style: f => stateStyle(IBGE_UF[String(f.properties.codarea)]),
+      onEachFeature: (f, layer) => {
+        layer.uf = IBGE_UF[String(f.properties.codarea)];
+        layer.bindTooltip('', { sticky: true });
+        layer.on('click', () => {
+          const sel = document.getElementById('lostState');
+          setLostState(sel.value === layer.uf ? '' : layer.uf);
+        });
+      }
+    }).addTo(lostMap);
+    if (brStatesLayer.bringToBack) brStatesLayer.bringToBack();
+    refreshStateLayer();
+    if (document.getElementById('lostState').value) zoomToState(document.getElementById('lostState').value);
+  } catch (e) {
+    const st = document.getElementById('lostStatus');
+    if (st) st.textContent = 'Não foi possível carregar o contorno dos estados agora. Use o seletor de estado.';
+  }
+}
+
+function stateCounts() {
+  const c = {};
+  lostItems.forEach(i => { if (i.state) { c[i.state] = c[i.state] || { lost: 0, pets: 0 }; c[i.state].lost++; } });
+  allPets.forEach(p => { if (p.state) { c[p.state] = c[p.state] || { lost: 0, pets: 0 }; c[p.state].pets++; } });
+  return c;
+}
+
+function stateStyle(uf) {
+  const has = uf && stateCounts()[uf];
+  const sel = uf && document.getElementById('lostState')?.value === uf;
+  return { color: sel ? '#1e73d8' : '#7d8fa0', weight: sel ? 3 : 1, fillColor: has ? '#6cc58f' : '#dfe7ee', fillOpacity: sel ? 0.25 : 0.55 };
+}
+
+function refreshStateLayer() {
+  if (!brStatesLayer) return;
+  const counts = stateCounts();
+  brStatesLayer.eachLayer(layer => {
+    layer.setStyle(stateStyle(layer.uf));
+    const c = counts[layer.uf] || { lost: 0, pets: 0 };
+    const name = BR_STATES[layer.uf] ? BR_STATES[layer.uf][0] : layer.uf;
+    if (layer.setTooltipContent) layer.setTooltipContent(`<b>${name}</b><br>${c.lost} aviso(s) • ${c.pets} pet(s) para adoção`);
+  });
+}
+
+function zoomToState(uf) {
+  let layerFound = null;
+  if (brStatesLayer) brStatesLayer.eachLayer(l => { if (l.uf === uf) layerFound = l; });
+  if (layerFound) lostMap.fitBounds(layerFound.getBounds(), { padding: [20, 20] });
+  else if (BR_STATES[uf]) lostMap.setView([BR_STATES[uf][2], BR_STATES[uf][3]], BR_STATES[uf][4]);
+}
+
+function setLostState(uf) {
+  document.getElementById('lostState').value = uf;
+  lostFilterNeighborhoods();
+  renderLost();
+  if (uf) document.getElementById('lostMap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function lostAllBrazil() {
+  lostUserPos = null;
+  document.getElementById('lostState').value = '';
+  document.getElementById('lostCity').value = '';
+  document.getElementById('lostNeighborhood').value = '';
+  renderLost();
+}
+
+function focusLost(id) {
+  const i = lostItems.find(x => x.id === id);
+  if (!i || !lostMap) return;
+  lostMap.setView([i.lat, i.lng], 16);
+  lostLayer.eachLayer(l => { if (l.lostId === id) l.openPopup(); });
+  document.getElementById('lostMap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function scrollToLost(id) {
+  const el = document.getElementById('lost-' + id);
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800); }
+}
+
+function lostNearMe() {
+  const st = document.getElementById('lostStatus');
+  if (!navigator.geolocation) { st.textContent = 'Este navegador não permite usar a localização.'; return; }
+  st.textContent = 'Aguardando a sua permissão...';
+  navigator.geolocation.getCurrentPosition(pos => {
+    lostUserPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    renderLost();
+  }, err => {
+    st.textContent = err.code === 1 ? 'Você não permitiu a localização. Permita nas configurações do navegador e tente de novo.' : 'Não foi possível obter a localização agora.';
+  }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+}
+
+async function resolveLost(id) {
+  if (!confirm('Marcar este aviso como resolvido? Ele sai do mapa.')) return;
+  const { error } = await sb.from('lost_animals').update({ status: 'resolved' }).eq('id', id);
+  if (error) { alert('Erro: ' + error.message); return; }
+  loadLostPage();
+}
+
+async function deleteLost(id) {
+  if (!confirm('Excluir este aviso de vez?')) return;
+  const { error } = await sb.from('lost_animals').delete().eq('id', id);
+  if (error) { alert('Erro: ' + error.message); return; }
+  loadLostPage();
+}
+
+// ---------- formulário de aviso ----------
+let lfMap = null, lfMarker = null, lfPos = null;
+
+function openLostForm() {
+  if (!currentUser) {
+    alert('Entre na sua conta para avisar um animal perdido ou encontrado.');
+    openAuthModal();
+    return;
+  }
+  lfPos = null; lfMarker = null;
+  openPetToolModal(`
+    <h3>📢 Avisar um animal</h3>
+    <form onsubmit="saveLost(event)" class="lost-form">
+      <div class="lost-kind">
+        <label><input type="radio" name="lfKind" value="lost" checked> 🔴 Perdi meu animal</label>
+        <label><input type="radio" name="lfKind" value="found"> 🟢 Encontrei um animal</label>
+      </div>
+      <label>Nome do animal (se souber)</label>
+      <input type="text" id="lfName" maxlength="40" placeholder="Ex.: Bidu">
+      <label>Tipo de animal</label>
+      <select id="lfType">${Object.entries(LOST_TYPE_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      <label>Descrição (cor, porte, coleira, como foi visto)</label>
+      <textarea id="lfDesc" rows="3" maxlength="600" required placeholder="Ex.: Cachorro caramelo pequeno, coleira azul, sumiu perto da praça."></textarea>
+      <label>Foto (opcional)</label>
+      <input type="file" id="lfPhoto" accept="image/*">
+      <label>CEP de onde foi visto (preenche cidade e bairro)</label>
+      <input type="text" id="lfCep" inputmode="numeric" maxlength="9" placeholder="Ex.: 80010-000" oninput="cepAutofill('lfCep','lfCity','lfNb','lfCepStatus','lfState')">
+      <small id="lfCepStatus" style="color:#777;"></small>
+      <label>Estado</label>
+      <select id="lfState">${stateOptionsHtml('PR', false)}</select>
+      <div class="lost-two"><div><label>Cidade</label><input type="text" id="lfCity" required value="${escapeHtml(currentUser.city || '')}"></div>
+      <div><label>Bairro</label><input type="text" id="lfNb"></div></div>
+      <label>Data em que foi visto</label>
+      <input type="date" id="lfDate" value="${new Date().toISOString().slice(0, 10)}" max="${new Date().toISOString().slice(0, 10)}">
+      <label>Onde foi? Toque no mapa para marcar</label>
+      <div class="lost-pickbar"><button type="button" class="btn-secondary" onclick="lfUseMyPos()">📍 Usar minha localização</button><small id="lfPosStatus" style="color:#777;">Sem ponto marcado. Se você não marcar, usamos o bairro/cidade.</small></div>
+      <div id="lfMap" class="lost-map lost-map-small"></div>
+      <label>Seu contato (telefone ou WhatsApp)</label>
+      <input type="tel" id="lfContact" required minlength="8" maxlength="60" placeholder="Ex.: (41) 99999-0000">
+      <small style="color:#777;">Só quem está logado no PetMatch vê o contato. Use um número que você aceite divulgar.</small>
+      <button class="btn-primary" type="submit" style="margin-top:0.9rem; width:100%;">Publicar aviso</button>
+    </form>`);
+  loadLeaflet().then(() => {
+    const el = document.getElementById('lfMap');
+    if (!el) return;
+    lfMap = L.map(el).setView(lostMap ? lostMap.getCenter() : [-25.4284, -49.2733], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(lfMap);
+    lfMap.on('click', ev => lfSetPos(ev.latlng.lat, ev.latlng.lng));
+    setTimeout(() => lfMap && lfMap.invalidateSize(), 120);
+  }).catch(() => { const el = document.getElementById('lfMap'); if (el) el.innerHTML = '<p class="lost-map-msg">Mapa indisponível. Vamos usar o bairro/cidade.</p>'; });
+}
+
+function lfSetPos(lat, lng) {
+  lfPos = { lat, lng };
+  if (lfMarker) lfMarker.setLatLng([lat, lng]);
+  else if (lfMap) lfMarker = L.marker([lat, lng], { icon: lostIcon('📍', 'lost') }).addTo(lfMap);
+  const st = document.getElementById('lfPosStatus');
+  if (st) st.textContent = '✔ Ponto marcado no mapa.';
+}
+
+function lfUseMyPos() {
+  if (!navigator.geolocation) { alert('Este navegador não permite usar a localização.'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    lfSetPos(pos.coords.latitude, pos.coords.longitude);
+    if (lfMap) lfMap.setView([pos.coords.latitude, pos.coords.longitude], 16);
+  }, () => alert('Não foi possível pegar a sua localização. Toque no mapa para marcar o ponto.'), { timeout: 15000 });
+}
+
+async function saveLost(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+  const val = id => document.getElementById(id).value.trim();
+  const cep = normCep(val('lfCep'));
+  if (cep && cep.length !== 8) { alert('O CEP deve ter 8 números.'); return; }
+  const contact = val('lfContact');
+  if (contact.replace(/\D/g, '').length < 8) { alert('Informe um telefone ou WhatsApp válido.'); return; }
+  if (val('lfDesc').length < 5) { alert('Descreva o animal em poucas palavras.'); return; }
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = 'Publicando...';
+
+  let pos = lfPos;
+  if (!pos) pos = await geocodePlace([val('lfNb'), val('lfCity'), val('lfState'), 'Brasil'].filter(Boolean).join(', '));
+  const row = {
+    reporter_id: currentUser.id,
+    kind: document.querySelector('input[name=lfKind]:checked').value,
+    pet_name: val('lfName') || null,
+    type: val('lfType'),
+    description: val('lfDesc'),
+    city: val('lfCity'), neighborhood: val('lfNb') || null, state: val('lfState') || null, cep: cep || null,
+    lat: pos ? pos.lat : null, lng: pos ? pos.lng : null,
+    seen_on: val('lfDate') || new Date().toISOString().slice(0, 10),
+    contact
+  };
+  const file = document.getElementById('lfPhoto').files[0];
+  try {
+    if (file) row.photo_url = await uploadFileToBucket('user-uploads', file, `lost-animals/${currentUser.id}`);
+  } catch (err) {
+    alert('Erro ao enviar a foto: ' + err.message);
+    btn.disabled = false; btn.textContent = 'Publicar aviso';
+    return;
+  }
+  const { error } = await sb.from('lost_animals').insert(row);
+  if (error) {
+    alert('Não foi possível publicar: ' + error.message);
+    btn.disabled = false; btn.textContent = 'Publicar aviso';
+    return;
+  }
+  closeLostForm();
+  alert('Aviso publicado! Ele já aparece no mapa.');
+  loadLostPage();
+}
+
+function closeLostForm() {
+  if (lfMap) { lfMap.remove(); lfMap = null; lfMarker = null; }
+  closePetToolModal();
 }
