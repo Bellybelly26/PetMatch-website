@@ -50,6 +50,8 @@ Plataforma web para adoção de animais de estimação, conectando adotadores co
 - ✅ **Ajuda e Reclamações:** perguntas frequentes e formulário (ajuda, reclamação ou sugestão); Administrador e Supervisor respondem pelo painel
 - ✅ **Log de sistema:** registro de auditoria (acessos, solicitações, moderação, pets, mensagens e LGPD), visível só ao Administrador, com filtro e download em CSV; ninguém altera nem apaga os registros
 - ✅ **Filtro de pets por CEP**, **Parceiros perto de você** (por cidade, CEP e categoria, com destaque pago), **anúncios** da prefeitura e de empresas (com explicação, local e link para o mapa) e distância até o parceiro quando o usuário permite a localização do navegador (não é guardada) e **Lojinha** (vitrine); tudo gerenciado pelo Administrador e Supervisor no painel
+- ✅ **Animais perdidos e encontrados:** página "Perdidos" com mapa (OpenStreetMap), lista, filtros (tipo, cidade, bairro), "perto de mim" e camada com os pets para adoção; qualquer usuário logado avisa um animal (foto, CEP, ponto no mapa, contato)
+- ✅ **Bairro nos pets e nos filtros:** o CEP preenche cidade e bairro sozinho (ViaCEP); o filtro de bairros mostra só os que existem
 - ✅ **Sem planos pagos:** todos os recursos são gratuitos (removidos a pedido da orientação do projeto)
 - ✅ **LGPD:** Política de Privacidade, consentimento no cadastro (registrado com data e versão), aviso de armazenamento no navegador, página "Meus Dados" para baixar os dados (JSON) e excluir a própria conta
 - ✅ Estatísticas da home com dados reais do banco (pets adotados, disponíveis e famílias felizes)
@@ -95,8 +97,10 @@ Crie um projeto gratuito em [supabase.com](https://supabase.com/dashboard), abra
 8. `supabase-add-partners-ads-shop.sql` — adiciona CEP (pets, parceiros e perfil), parceiros por localização, anúncios (prefeitura e empresas) e lojinha, com dados de exemplo
 9. `supabase-add-plans-roles-features.sql` — planos anuais (assinatura simulada), perfis Prefeitura e Empresa, aprovação de conteúdo, equipe da ONG, chat, eventos, carteirinha/saúde/diário, relatórios e visão geral
 10. `supabase-remove-plans.sql` — **remove os planos e recursos pagos** (rode depois do script 9; pode rodar mais de uma vez)
-11. `supabase-seed-pets-exemplo.sql` *(opcional)* — cadastra alguns pets de exemplo para teste (é necessário trocar o `ong_id` pelo id de uma ONG já cadastrada)
-12. (opcional) `supabase-seed-parceiros-loja.sql` — lojas reais (Petz, uma por capital), produtos da loja e anúncios de demonstração
+11. `supabase-add-bairros-perdidos.sql` — **bairro e posição nos pets** e a tabela de **animais perdidos/encontrados** (o contato só aparece para quem está logado; no máximo 10 avisos abertos por pessoa)
+12. `supabase-seed-pets-exemplo.sql` *(opcional)* — cadastra alguns pets de exemplo para teste (é necessário trocar o `ong_id` pelo id de uma ONG já cadastrada)
+13. (opcional) `supabase-seed-mais-pets.sql` — 26 pets com bairro e posição no mapa (usa a primeira ONG cadastrada; rode depois do script 11)
+14. (opcional) `supabase-seed-parceiros-loja.sql` — lojas reais (Petz, uma por capital), produtos da loja e anúncios de demonstração
 
 **3. Configure as credenciais do projeto**
 
@@ -139,6 +143,8 @@ PetMatch-website-main/
 ├── supabase-add-partners-ads-shop.sql                    # Script 8: CEP, parceiros, anúncios e lojinha
 ├── supabase-add-plans-roles-features.sql                 # Script 9: planos, perfis e recursos pagos
 ├── supabase-remove-plans.sql                             # Script 10: remove planos e recursos pagos
+├── supabase-add-bairros-perdidos.sql                     # Script 11: bairros e animais perdidos
+├── supabase-seed-mais-pets.sql                           # Script opcional: 26 pets com bairro e mapa
 ├── supabase-seed-pets-exemplo.sql                        # Script opcional: pets de exemplo
 └── README.md                                             # Este arquivo
 ```

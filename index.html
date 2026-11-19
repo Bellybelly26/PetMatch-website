@@ -6,6 +6,7 @@
   <title>PetMatch - Conectando Corações e Patas</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
   <div id="app">
@@ -18,6 +19,7 @@
         </div>
         <nav class="nav">
           <a href="#" onclick="showPage('home')">Início</a>
+          <a href="#" onclick="showPage('lost')">Perdidos</a>
           <a href="#" onclick="showPage('partners')">Parceiros</a>
           <a href="#" onclick="showPage('shop')">Loja</a>
           <a href="#" onclick="showPage('help')">Ajuda</a>
@@ -80,7 +82,7 @@
         <!-- EXPLORAR PETS -->
         <section class="explore-section">
           <h2>Explorar Pets</h2>
-          <p class="section-sub">Conheça alguns dos animais que estão esperando por uma família.</p>
+          <p class="section-sub">Conheça os animais que estão esperando por uma família. Toque em Detalhes para saber mais.</p>
           <div class="pets-grid" id="homePetsGrid"></div>
           <button class="btn-primary" style="margin-top:2rem;" onclick="showPage('pets')">Ver todos os pets</button>
         </section>
@@ -336,6 +338,12 @@
               <label>Localização</label>
               <input type="text" id="filterLocation" placeholder="Cidade..." onkeyup="filterPets()">
             </div>
+            <div class="filter-group">
+              <label>Bairro</label>
+              <select id="filterNeighborhood" onchange="filterPets()">
+                <option value="">Todos os bairros</option>
+              </select>
+            </div>
             <div class="filter-group" id="filterCompatGroup" style="display:none;">
               <label><input type="checkbox" id="filterCompat" onchange="filterPets()"> Mais compatíveis primeiro</label>
             </div>
@@ -351,6 +359,42 @@
             </div>
           </div>
           <div class="pets-grid" id="petsGrid"></div>
+        </div>
+      </div>
+
+      <!-- ANIMAIS PERDIDOS / ENCONTRADOS -->
+      <div id="page-lost" class="page">
+        <div class="lost-container">
+          <h2>🐾 Animais Perdidos e Encontrados</h2>
+          <p class="section-sub">Perdeu seu bichinho ou achou um na rua? Avise aqui e veja no mapa onde ele foi visto.</p>
+          <div class="lost-top">
+            <button class="btn-primary" onclick="openLostForm()">📢 Avisar um animal</button>
+            <button class="btn-secondary" id="lostNearBtn" onclick="lostNearMe()">📍 Perto de mim</button>
+          </div>
+          <div class="lost-filters">
+            <select id="lostKind" onchange="renderLost()">
+              <option value="">Perdidos e encontrados</option>
+              <option value="lost">🔴 Só perdidos</option>
+              <option value="found">🟢 Só encontrados</option>
+            </select>
+            <select id="lostType" onchange="renderLost()">
+              <option value="">Todos os animais</option>
+              <option value="dog">Cães</option>
+              <option value="cat">Gatos</option>
+              <option value="bird">Pássaros</option>
+              <option value="rabbit">Coelhos</option>
+              <option value="other">Outros</option>
+            </select>
+            <input type="text" id="lostCity" placeholder="Cidade..." oninput="renderLost()">
+            <select id="lostNeighborhood" onchange="renderLost()">
+              <option value="">Todos os bairros</option>
+            </select>
+          </div>
+          <label class="lost-check"><input type="checkbox" id="lostShowPets" onchange="renderLost()"> Mostrar também no mapa os pets para adoção (🔵)</label>
+          <div class="lost-legend"><span><i class="dot dot-lost"></i> Perdido</span><span><i class="dot dot-found"></i> Encontrado</span><span><i class="dot dot-adopt"></i> Para adoção</span></div>
+          <div id="lostMap" class="lost-map"><p class="lost-map-msg">Carregando o mapa...</p></div>
+          <p id="lostStatus" class="lost-status"></p>
+          <div id="lostList" class="lost-list"></div>
         </div>
       </div>
 
@@ -943,6 +987,7 @@
             <li><a href="#" onclick="showPage('home')">Início</a></li>
             <li><a href="#" onclick="showPage('pets')">Pets</a></li>
             <li><a href="#" onclick="goAbout(); return false;">Sobre</a></li>
+            <li><a href="#" onclick="showPage('lost')">Animais perdidos</a></li>
             <li><a href="#" onclick="showPage('partners')">Parceiros perto de você</a></li>
             <li><a href="#" onclick="showPage('shop')">Lojinha</a></li>
             <li><a href="#" onclick="showPage('roles')">Perfis e Funções</a></li>
@@ -1199,7 +1244,12 @@
         </div>
         <div class="form-group">
           <label>CEP</label>
-          <input type="text" id="petFormCep" placeholder="Ex.: 80010-000" inputmode="numeric" maxlength="9">
+          <input type="text" id="petFormCep" placeholder="Ex.: 80010-000" inputmode="numeric" maxlength="9" oninput="cepAutofill('petFormCep','petFormCity','petFormNeighborhood','petFormCepStatus')">
+          <small id="petFormCepStatus" style="color:#777;">Digite o CEP e a cidade e o bairro são preenchidos sozinhos.</small>
+        </div>
+        <div class="form-group">
+          <label>Bairro</label>
+          <input type="text" id="petFormNeighborhood" placeholder="Ex.: Batel">
         </div>
         <div class="form-group">
           <label>Saúde e Comportamento</label>
