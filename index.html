@@ -339,6 +339,10 @@
               <input type="text" id="filterLocation" placeholder="Cidade..." onkeyup="filterPets()">
             </div>
             <div class="filter-group">
+              <label>Estado</label>
+              <select id="filterState" onchange="filterPets()"></select>
+            </div>
+            <div class="filter-group">
               <label>Bairro</label>
               <select id="filterNeighborhood" onchange="filterPets()">
                 <option value="">Todos os bairros</option>
@@ -366,12 +370,14 @@
       <div id="page-lost" class="page">
         <div class="lost-container">
           <h2>🐾 Animais Perdidos e Encontrados</h2>
-          <p class="section-sub">Perdeu seu bichinho ou achou um na rua? Avise aqui e veja no mapa onde ele foi visto.</p>
+          <p class="section-sub">Perdeu seu bichinho ou achou um na rua? Avise aqui e veja no mapa do Brasil onde ele foi visto. Toque em um estado para dar zoom.</p>
           <div class="lost-top">
             <button class="btn-primary" onclick="openLostForm()">📢 Avisar um animal</button>
             <button class="btn-secondary" id="lostNearBtn" onclick="lostNearMe()">📍 Perto de mim</button>
+            <button class="btn-secondary" onclick="lostAllBrazil()">🇧🇷 Ver o Brasil todo</button>
           </div>
           <div class="lost-filters">
+            <select id="lostState" onchange="renderLost()"></select>
             <select id="lostKind" onchange="renderLost()">
               <option value="">Perdidos e encontrados</option>
               <option value="lost">🔴 Só perdidos</option>
@@ -391,7 +397,7 @@
             </select>
           </div>
           <label class="lost-check"><input type="checkbox" id="lostShowPets" onchange="renderLost()"> Mostrar também no mapa os pets para adoção (🔵)</label>
-          <div class="lost-legend"><span><i class="dot dot-lost"></i> Perdido</span><span><i class="dot dot-found"></i> Encontrado</span><span><i class="dot dot-adopt"></i> Para adoção</span></div>
+          <div class="lost-legend"><span><i class="dot dot-lost"></i> Perdido</span><span><i class="dot dot-found"></i> Encontrado</span><span><i class="dot dot-adopt"></i> Para adoção</span><span><i class="dot dot-state"></i> Estado com registros</span></div>
           <div id="lostMap" class="lost-map"><p class="lost-map-msg">Carregando o mapa...</p></div>
           <p id="lostStatus" class="lost-status"></p>
           <div id="lostList" class="lost-list"></div>
@@ -1244,8 +1250,12 @@
         </div>
         <div class="form-group">
           <label>CEP</label>
-          <input type="text" id="petFormCep" placeholder="Ex.: 80010-000" inputmode="numeric" maxlength="9" oninput="cepAutofill('petFormCep','petFormCity','petFormNeighborhood','petFormCepStatus')">
+          <input type="text" id="petFormCep" placeholder="Ex.: 80010-000" inputmode="numeric" maxlength="9" oninput="cepAutofill('petFormCep','petFormCity','petFormNeighborhood','petFormCepStatus','petFormState')">
           <small id="petFormCepStatus" style="color:#777;">Digite o CEP e a cidade e o bairro são preenchidos sozinhos.</small>
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="petFormState"></select>
         </div>
         <div class="form-group">
           <label>Bairro</label>

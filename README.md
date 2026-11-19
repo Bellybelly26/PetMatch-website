@@ -50,8 +50,8 @@ Plataforma web para adoção de animais de estimação, conectando adotadores co
 - ✅ **Ajuda e Reclamações:** perguntas frequentes e formulário (ajuda, reclamação ou sugestão); Administrador e Supervisor respondem pelo painel
 - ✅ **Log de sistema:** registro de auditoria (acessos, solicitações, moderação, pets, mensagens e LGPD), visível só ao Administrador, com filtro e download em CSV; ninguém altera nem apaga os registros
 - ✅ **Filtro de pets por CEP**, **Parceiros perto de você** (por cidade, CEP e categoria, com destaque pago), **anúncios** da prefeitura e de empresas (com explicação, local e link para o mapa) e distância até o parceiro quando o usuário permite a localização do navegador (não é guardada) e **Lojinha** (vitrine); tudo gerenciado pelo Administrador e Supervisor no painel
-- ✅ **Animais perdidos e encontrados:** página "Perdidos" com mapa (OpenStreetMap), lista, filtros (tipo, cidade, bairro), "perto de mim" e camada com os pets para adoção; qualquer usuário logado avisa um animal (foto, CEP, ponto no mapa, contato)
-- ✅ **Bairro nos pets e nos filtros:** o CEP preenche cidade e bairro sozinho (ViaCEP); o filtro de bairros mostra só os que existem
+- ✅ **Animais perdidos e encontrados:** página "Perdidos" com **mapa do Brasil** (OpenStreetMap + Leaflet, sem Google Maps; contornos dos estados do IBGE, clicáveis com zoom e filtro por estado), lista, filtros (tipo, cidade, bairro), "perto de mim" e camada com os pets para adoção; qualquer usuário logado avisa um animal (foto, CEP, ponto no mapa, contato)
+- ✅ **Bairro nos pets e nos filtros:** o CEP preenche cidade e bairro sozinho (ViaCEP); o filtro de bairros mostra só os que existem; pets e avisos também têm Estado (UF) e filtro por estado
 - ✅ **Sem planos pagos:** todos os recursos são gratuitos (removidos a pedido da orientação do projeto)
 - ✅ **LGPD:** Política de Privacidade, consentimento no cadastro (registrado com data e versão), aviso de armazenamento no navegador, página "Meus Dados" para baixar os dados (JSON) e excluir a própria conta
 - ✅ Estatísticas da home com dados reais do banco (pets adotados, disponíveis e famílias felizes)
