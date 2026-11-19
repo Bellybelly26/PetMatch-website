@@ -1979,3 +1979,48 @@ button.plan-btn { width:100%; cursor:pointer; font-family:inherit; }
 /* conteúdo completo do Sobre no fim do Início */
 .home-about-full { padding: 0 0 2rem; }
 .home-about-full .about-container { padding-top: 0; }
+
+/* ===== Animais perdidos e encontrados ===== */
+.lost-container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.lost-container h2 { text-align: center; color: var(--primary-blue); margin-bottom: 0.3rem; }
+.lost-top { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin: 1rem 0; }
+.lost-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.6rem; margin-bottom: 0.7rem; }
+.lost-filters select, .lost-filters input { padding: 0.65rem; border: 2px solid var(--border-color); border-radius: 10px; font: inherit; background: #fff; min-width: 0; }
+.lost-check { display: block; font-size: 0.92rem; margin-bottom: 0.4rem; }
+.lost-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #555; margin-bottom: 0.6rem; }
+.lost-legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.dot-lost { background: #e53935; } .dot-found { background: #2e9e4f; } .dot-adopt { background: #1e73d8; }
+.lost-map { height: 380px; border-radius: 16px; border: 2px solid var(--border-color); overflow: hidden; background: #eef3f7; z-index: 0; }
+.lost-map-small { height: 230px; margin-bottom: 0.8rem; }
+.lost-map-msg { padding: 2rem 1rem; text-align: center; color: #666; }
+.lost-status { color: #666; font-size: 0.9rem; margin: 0.6rem 0; }
+.lost-pin-wrap { background: none; border: none; }
+.lost-pin { width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 3px solid #999; display: flex; align-items: center; justify-content: center; font-size: 19px; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.lost-pin.lost { border-color: #e53935; } .lost-pin.found { border-color: #2e9e4f; } .lost-pin.adopt { border-color: #1e73d8; }
+.lost-list { display: grid; gap: 0.9rem; }
+.lost-card { display: flex; gap: 0.9rem; background: #fff; border: 2px solid var(--border-color); border-left-width: 6px; border-radius: 14px; padding: 0.8rem; transition: box-shadow .3s; }
+.lost-card.lost { border-left-color: #e53935; } .lost-card.found { border-left-color: #2e9e4f; }
+.lost-card.flash { box-shadow: 0 0 0 4px rgba(30,115,216,.35); }
+.lost-card img, .lost-noimg { width: 110px; height: 110px; object-fit: cover; border-radius: 12px; flex: none; }
+.lost-noimg { display: flex; align-items: center; justify-content: center; font-size: 2.6rem; background: #f3f0ea; }
+.lost-card-body { min-width: 0; flex: 1; text-align: left; }
+.lost-card-body h4 { margin: 0.2rem 0; } .lost-card-body h4 small { color: #888; font-weight: 400; }
+.lost-card-body p { margin: 0.25rem 0; font-size: 0.92rem; color: #444; overflow-wrap: anywhere; }
+.lost-where, .lost-km { color: #666; font-size: 0.85rem; }
+.lost-tag { font-size: 0.75rem; font-weight: 700; }
+.lost-tag.lost { color: #e53935; } .lost-tag.found { color: #2e9e4f; }
+.lost-wa { color: #1a8f4a; font-weight: 700; margin-left: 0.4rem; }
+.lost-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.lost-actions button, .lost-login { padding: 0.45rem 0.8rem; font-size: 0.85rem; }
+.lost-del { color: #c0392b; }
+.lost-empty { text-align: center; color: #888; padding: 1.5rem 0; }
+.lost-form label { display: block; margin: 0.7rem 0 0.25rem; font-weight: 600; font-size: 0.92rem; }
+.lost-form input[type=text], .lost-form input[type=tel], .lost-form input[type=date], .lost-form select, .lost-form textarea { width: 100%; padding: 0.6rem; border: 2px solid var(--border-color); border-radius: 10px; font: inherit; box-sizing: border-box; }
+.lost-kind { display: grid; gap: 0.3rem; }
+.lost-kind label { font-weight: 500; margin: 0; }
+.lost-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.lost-pickbar { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.5rem; align-items: flex-start; }
+@media (max-width: 520px) { .lost-card { flex-direction: column; } .lost-card img, .lost-noimg { width: 100%; height: 170px; } .lost-two { grid-template-columns: 1fr; } .lost-map { height: 320px; } }
+.dot-state { background: #6cc58f; }
+.lost-container .lost-map { height: 430px; }
+@media (max-width: 520px) { .lost-container .lost-map { height: 340px; } .lost-container .lost-map-small { height: 230px; } }
